@@ -225,8 +225,8 @@ export function Purchases() {
 
           {/* Buscador único */}
           <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="flex-1">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+              <div className="flex-1 min-w-0">
                 {!createNewMode ? (
                   <SearchSelect
                     label="Buscar producto existente"
@@ -282,16 +282,14 @@ export function Purchases() {
                   </div>
                 )}
               </div>
-              <div className="flex items-end shrink-0">
-                {!createNewMode && (
-                  <button
-                    onClick={() => { setCreateNewMode(true); setSelectedProductId('') }}
-                    className="text-[11px] text-primary-light hover:underline whitespace-nowrap"
-                  >
-                    ¿No existe? Crear nuevo
-                  </button>
-                )}
-              </div>
+              {!createNewMode && (
+                <button
+                  onClick={() => { setCreateNewMode(true); setSelectedProductId('') }}
+                  className="text-left sm:text-right text-[11px] text-primary-light hover:underline whitespace-nowrap shrink-0"
+                >
+                  ¿No existe? Crear nuevo
+                </button>
+              )}
             </div>
 
             {/* Producto seleccionado / nuevo: costo + cantidad + agregar */}

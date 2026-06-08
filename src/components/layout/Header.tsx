@@ -1,5 +1,6 @@
 import { Menu } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
+import MarelyLogo from '../ui/MarelyLogo'
 
 const titles: Record<string, string> = {
   '/':           'Dashboard',
@@ -31,9 +32,18 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         >
           <Menu size={20} />
         </button>
-        <div>
+
+        {/* Mobile: logo | título */}
+        <div className="flex items-center gap-2 md:hidden">
+          <MarelyLogo iconOnly width={32} />
+          <span className="h-5 w-px bg-border-strong" />
+          <span className="text-[15px] font-semibold tracking-wide text-text/90">{title}</span>
+        </div>
+
+        {/* Desktop: título + fecha */}
+        <div className="hidden md:block">
           <h2 className="text-[15px] font-semibold text-text">{title}</h2>
-          <p className="hidden text-[10px] capitalize text-muted md:block">{today}</p>
+          <p className="text-[10px] capitalize text-muted">{today}</p>
         </div>
       </div>
 

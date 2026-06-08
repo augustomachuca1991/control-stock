@@ -9,6 +9,7 @@ interface MarelyLogoProps {
   dividerColor?: string;
   width?: string | number;
   className?: string;
+  iconOnly?: boolean;
 }
 
 const MarelyLogo: React.FC<MarelyLogoProps> = ({
@@ -20,7 +21,40 @@ const MarelyLogo: React.FC<MarelyLogoProps> = ({
   dividerColor = "#444444",
   width = "100%",
   className,
+  iconOnly,
 }) => {
+  if (iconOnly) {
+    return (
+      <svg
+        width={width}
+        viewBox="0 0 54 48"
+        role="img"
+        xmlns="http://www.w3.org/2000/svg"
+        className={className}
+        style={{ display: "block" }}
+      >
+        <title>ME</title>
+        {backgroundColor !== "transparent" && (
+          <rect width="54" height="48" fill={backgroundColor} rx="8" />
+        )}
+        <text
+          x="0" y="38"
+          fontFamily="'Playfair Display', 'Times New Roman', serif"
+          fontSize="40"
+          fontWeight="900"
+          fill={letterMColor}
+        >M</text>
+        <text
+          x="28" y="38"
+          fontFamily="'Playfair Display', 'Times New Roman', serif"
+          fontSize="40"
+          fontWeight="900"
+          fill={letterEColor}
+        >E</text>
+      </svg>
+    )
+  }
+
   return (
     <svg
       width={width}
