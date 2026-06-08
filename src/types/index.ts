@@ -32,7 +32,26 @@ export interface Sale {
   items: SaleItem[]
   total: number
   paymentMethod: PaymentMethod
+  status: SaleStatus
   createdAt: number
 }
 
 export type PaymentMethod = 'cash' | 'card' | 'transfer'
+
+export type SaleStatus = 'active' | 'voided'
+
+export interface PurchaseItem {
+  productId: string
+  productName: string
+  barcode: string
+  quantity: number
+  cost: number
+}
+
+export interface Purchase {
+  id: string
+  items: PurchaseItem[]
+  total: number
+  date: string
+  createdAt: number
+}

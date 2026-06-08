@@ -41,6 +41,7 @@ export const sales: Sale[] = [
     ],
     total: 12750,
     paymentMethod: 'card',
+    status: 'active',
     createdAt: now - 2 * day,
   },
   {
@@ -50,6 +51,7 @@ export const sales: Sale[] = [
     ],
     total: 9600,
     paymentMethod: 'cash',
+    status: 'active',
     createdAt: now - 3 * day,
   },
   {
@@ -61,6 +63,7 @@ export const sales: Sale[] = [
     ],
     total: 24500,
     paymentMethod: 'transfer',
+    status: 'active',
     createdAt: now - 5 * day,
   },
   {
@@ -71,6 +74,7 @@ export const sales: Sale[] = [
     ],
     total: 9800,
     paymentMethod: 'cash',
+    status: 'active',
     createdAt: now - 7 * day,
   },
   {
@@ -81,6 +85,7 @@ export const sales: Sale[] = [
     ],
     total: 14600,
     paymentMethod: 'card',
+    status: 'active',
     createdAt: now - 10 * day,
   },
   {
@@ -91,6 +96,7 @@ export const sales: Sale[] = [
     ],
     total: 15000,
     paymentMethod: 'card',
+    status: 'active',
     createdAt: now - 12 * day,
   },
   {
@@ -101,6 +107,7 @@ export const sales: Sale[] = [
     ],
     total: 21750,
     paymentMethod: 'transfer',
+    status: 'active',
     createdAt: now - 15 * day,
   },
   {
@@ -112,6 +119,7 @@ export const sales: Sale[] = [
     ],
     total: 20000,
     paymentMethod: 'cash',
+    status: 'active',
     createdAt: now - 18 * day,
   },
 ]

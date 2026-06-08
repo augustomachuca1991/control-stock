@@ -10,6 +10,7 @@ interface CreateSalePayload {
 interface SaleState {
   sales: Sale[]
   createSale: (payload: CreateSalePayload) => Sale | null
+  voidSale: (id: string) => void
   getRecentSales: (limit?: number) => Sale[]
   getTotalRevenue: () => number
   getSalesCount: () => number
@@ -29,18 +30,30 @@ export const useSaleStore = create<SaleState>((set, get) => ({
       items: payload.items,
       total,
       paymentMethod: payload.paymentMethod,
+      status: 'active',
       createdAt: Date.now(),
     }
     set((state) => ({ sales: [sale, ...state.sales] }))
     return sale
   },
-  getRecentSales: (limit = 5) => get().sales.slice(0, limit),
+  voidSale: (id) =>
+    set((state) => ({
+      sales: state.sales.map((s) =>
+        s.id === id ? { ...s, status: 'voided' as const } : s
+      ),
+    })),
+  getRecentSales: (limit = 5) =>
+    get().sales.filter((s) => s.status === 'active').slice(0, limit),
   getTotalRevenue: () =>
-    get().sales.reduce((sum, s) => sum + s.total, 0),
-  getSalesCount: () => get().sales.length,
+    get().sales
+      .filter((s) => s.status === 'active')
+      .reduce((sum, s) => sum + s.total, 0),
+  getSalesCount: () =>
+    get().sales.filter((s) => s.status === 'active').length,
   getTodaySales: () => {
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
-    return get().sales.filter((s) => s.createdAt >= todayStart.getTime())
+    return get().sales
+      .filter((s) => s.status === 'active' && s.createdAt >= todayStart.getTime())
   },
 }))

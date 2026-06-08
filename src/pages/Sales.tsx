@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from 'react'
-import { Plus, Minus, Trash2, Barcode, ChevronRight, FileText } from 'lucide-react'
+import { Plus, Minus, Trash2, Barcode, ChevronRight, FileText, AlertCircle } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
@@ -10,7 +10,7 @@ import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
 import { useProductStore } from '../stores/useProductStore'
 import { useSaleStore } from '../stores/useSaleStore'
-import type { Sale } from '../types'
+import type { Sale, SaleStatus } from '../types'
 import { config } from '../config'
 
 interface CartItem {
@@ -31,12 +31,16 @@ export function Sales() {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [receiptOpen, setReceiptOpen] = useState(false)
   const [lastSale, setLastSale] = useState<Sale | null>(null)
+  const [voidConfirmOpen, setVoidConfirmOpen] = useState(false)
+  const [saleToVoid, setSaleToVoid] = useState<Sale | null>(null)
   const quantityRef = useRef<HTMLInputElement>(null)
 
   const products = useProductStore((s) => s.products)
   const sales = useSaleStore((s) => s.sales)
   const createSale = useSaleStore((s) => s.createSale)
+  const voidSale = useSaleStore((s) => s.voidSale)
   const reduceStock = useProductStore((s) => s.reduceStock)
+  const increaseStock = useProductStore((s) => s.increaseStock)
   const getProductById = useProductStore((s) => s.getProductById)
 
   const openCreate = useCallback(() => {
@@ -120,6 +124,14 @@ export function Sales() {
     if (sale) setReceiptOpen(true)
   }, [cart, paymentMethod, createSale, reduceStock])
 
+  const handleVoidSale = useCallback(() => {
+    if (!saleToVoid) return
+    saleToVoid.items.forEach((item) => increaseStock(item.productId, item.quantity))
+    voidSale(saleToVoid.id)
+    setVoidConfirmOpen(false)
+    setSaleToVoid(null)
+  }, [saleToVoid, increaseStock, voidSale])
+
   const productOptions = useMemo(() =>
     products
       .filter((p) => p.stock > 0)
@@ -133,12 +145,28 @@ export function Sales() {
   const paymentLabels = { cash: 'Efectivo', card: 'Tarjeta', transfer: 'Transferencia' }
   const paymentVariants = { cash: 'success' as const, card: 'info' as const, transfer: 'warning' as const }
 
+  const statusBadge = (status: SaleStatus) => {
+    if (status === 'voided') return <Badge variant="danger">Anulada</Badge>
+    return <Badge variant="success">Activa</Badge>
+  }
+
   const saleColumns = [
     { key: 'id', header: 'Venta', render: (s: Sale) => <span className="font-medium">#{s.id.slice(-4)}</span> },
+    { key: 'status', header: 'Estado', render: (s: Sale) => statusBadge(s.status) },
     { key: 'items', header: 'Productos', render: (s: Sale) => s.items.map((i) => `${i.productName} x${i.quantity}`).join(', ') },
     { key: 'total', header: 'Total', render: (s: Sale) => <span className="font-semibold">{config.currency.symbol}{s.total.toFixed(2)}</span> },
     { key: 'payment', header: 'Método', render: (s: Sale) => <Badge variant={paymentVariants[s.paymentMethod]}>{paymentLabels[s.paymentMethod]}</Badge> },
     { key: 'date', header: 'Fecha', render: (s: Sale) => new Date(s.createdAt).toLocaleDateString('es-ES', { dateStyle: 'medium' }) },
+    { key: 'actions', header: '', render: (s: Sale) =>
+      s.status === 'active' ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); setSaleToVoid(s); setVoidConfirmOpen(true) }}
+          className="text-[11px] text-danger-text hover:underline transition-colors"
+        >
+          Anular
+        </button>
+      ) : null
+    },
   ]
 
   return (
@@ -156,15 +184,28 @@ export function Sales() {
           renderCard={(s) => (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-medium text-slate-800">#{s.id.slice(-4)}</span>
-                <Badge variant={paymentVariants[s.paymentMethod]}>{paymentLabels[s.paymentMethod]}</Badge>
+                <span className="font-medium text-text">#{s.id.slice(-4)}</span>
+                <div className="flex items-center gap-2">
+                  {statusBadge(s.status)}
+                  <Badge variant={paymentVariants[s.paymentMethod]}>{paymentLabels[s.paymentMethod]}</Badge>
+                </div>
               </div>
-              <div className="text-xs text-slate-500">
+              <div className="text-[12px] text-muted">
                 {s.items.map((i) => `${i.productName} x${i.quantity}`).join(', ')}
               </div>
-              <div className="flex items-center justify-between border-t border-slate-100 pt-2">
-                <span className="text-xs text-slate-500">{new Date(s.createdAt).toLocaleDateString('es-ES', { dateStyle: 'medium' })}</span>
-                <span className="font-semibold text-slate-800">{config.currency.symbol}{s.total.toFixed(2)}</span>
+              <div className="flex items-center justify-between border-t border-border pt-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] text-muted">{new Date(s.createdAt).toLocaleDateString('es-ES', { dateStyle: 'medium' })}</span>
+                  {s.status === 'active' && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSaleToVoid(s); setVoidConfirmOpen(true) }}
+                      className="text-[11px] text-danger-text hover:underline"
+                    >
+                      Anular
+                    </button>
+                  )}
+                </div>
+                <span className="font-semibold text-text">{config.currency.symbol}{s.total.toFixed(2)}</span>
               </div>
             </div>
           )}
@@ -342,6 +383,40 @@ export function Sales() {
         <div className="mt-6 flex justify-end">
           <Button variant="gold-outline" onClick={() => setReceiptOpen(false)}>Cerrar</Button>
         </div>
+      </Modal>
+
+      {/* Confirmación de anulación */}
+      <Modal open={voidConfirmOpen} onClose={() => { setVoidConfirmOpen(false); setSaleToVoid(null) }} title="Anular Venta" size="sm">
+        {saleToVoid && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-lg border border-danger-dim bg-danger-dim/30 p-3">
+              <AlertCircle size={18} className="mt-0.5 shrink-0 text-danger-text" />
+              <div className="text-[12px] text-muted">
+                <p className="font-semibold text-danger-text">¿Estás seguro de anular esta venta?</p>
+                <p className="mt-1">Se restaurará el stock de todos los productos incluidos en la venta #{saleToVoid.id.slice(-6).toUpperCase()}.</p>
+                <p className="mt-1">Esta acción no se puede deshacer.</p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-surface p-3 space-y-1.5">
+              {saleToVoid.items.map((item) => (
+                <div key={item.productId} className="flex items-center justify-between text-[12px]">
+                  <span className="text-text">{item.productName}</span>
+                  <span className="text-muted-light">x{item.quantity} → se restaura stock</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-border pt-4">
+              <Button variant="gold-outline" onClick={() => { setVoidConfirmOpen(false); setSaleToVoid(null) }}>
+                Cancelar
+              </Button>
+              <Button variant="surface" onClick={handleVoidSale}>
+                <AlertCircle size={14} /> Confirmar Anulación
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   )
