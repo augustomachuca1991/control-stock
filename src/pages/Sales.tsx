@@ -4,6 +4,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { Select } from '../components/ui/Select'
+import { SearchSelect } from '../components/ui/SearchSelect'
 import { Input } from '../components/ui/Input'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
@@ -47,16 +48,16 @@ export function Sales() {
     setModalOpen(true)
   }, [])
 
-  const handleBarcodeSearch = useCallback((e: React.FormEvent) => {
-    e.preventDefault()
-    if (!barcodeInput) return
-    const found = products.find((p) => p.barcode === barcodeInput && p.stock > 0)
-    if (found) {
-      setSelectedProductId(found.id)
-      setBarcodeInput('')
-      setTimeout(() => quantityRef.current?.focus(), 100)
-    }
-  }, [barcodeInput, products])
+  /*   const handleBarcodeSearch = useCallback((e: React.FormEvent) => {
+      e.preventDefault()
+      if (!barcodeInput) return
+      const found = products.find((p) => p.barcode === barcodeInput && p.stock > 0)
+      if (found) {
+        setSelectedProductId(found.id)
+        setBarcodeInput('')
+        setTimeout(() => quantityRef.current?.focus(), 100)
+      }
+    }, [barcodeInput, products]) */
 
   const addToCart = useCallback(() => {
     if (!selectedProductId) return
@@ -124,7 +125,7 @@ export function Sales() {
       .filter((p) => p.stock > 0)
       .map((p) => ({
         value: p.id,
-        label: `${p.name} — ${config.currency.symbol}${p.price.toFixed(2)} (${p.stock} uds.)`,
+        label: `${p.name} — ${config.currency.symbol}${p.price.toFixed(2)} (${p.stock} uds.) · ${p.barcode}`,
       })),
     [products]
   )
@@ -172,27 +173,15 @@ export function Sales() {
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nueva Venta" size="lg">
         <div className="space-y-4">
-          <form onSubmit={handleBarcodeSearch} className="flex gap-3">
+
+          <div className="flex gap-3 items-end">
             <div className="flex-1">
-              <Input
-                placeholder="Escanear código de barras..."
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                icon={<Barcode size={16} className="text-slate-400" />}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit" disabled={!barcodeInput}>Buscar</Button>
-            </div>
-          </form>
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <Select
+              <SearchSelect
                 label="Producto"
                 options={productOptions}
-                placeholder="Seleccionar producto"
                 value={selectedProductId}
-                onChange={(e) => setSelectedProductId(e.target.value)}
+                onChange={setSelectedProductId}
+                placeholder="Buscar por nombre o código de barras..."
               />
             </div>
             <div className="w-24">

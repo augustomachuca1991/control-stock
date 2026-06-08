@@ -29,12 +29,10 @@ export function Modal({ open, onClose, title, size = 'md', children }: ModalProp
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
-      {/* Panel */}
       <div className={`relative w-full ${sizes[size]} rounded-[10px] border border-border bg-card shadow-xl`}>
         {title && (
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
@@ -47,7 +45,7 @@ export function Modal({ open, onClose, title, size = 'md', children }: ModalProp
             </button>
           </div>
         )}
-        <div className="p-5">{children}</div>
+        <div className="overflow-visible p-5">{children}</div>
       </div>
     </div>
   )

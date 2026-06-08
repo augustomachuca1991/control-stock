@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { Plus, Trash2, Barcode, Package, FileText, Search } from 'lucide-react'
+import { Plus, Trash2, Package, FileText, CheckCircle2 } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -21,6 +21,7 @@ interface PurchaseItem {
   quantity: string
   isNew: boolean
   description: string
+  searchQuery: string
 }
 
 function createEmptyItem(): PurchaseItem {
@@ -33,8 +34,9 @@ function createEmptyItem(): PurchaseItem {
     categoryId: '',
     cost: '',
     quantity: '1',
-    isNew: true,
+    isNew: false,
     description: '',
+    searchQuery: '',
   }
 }
 
@@ -66,29 +68,45 @@ export function Purchases() {
     setItems((prev) => prev.map((i) => (i.tempId === tempId ? { ...i, ...data } : i)))
   }, [])
 
-  const handleBarcodeSearch = useCallback((tempId: string, barcode: string) => {
-    const found = products.find((p) => p.barcode === barcode)
+  const handleSearch = useCallback((tempId: string, query: string) => {
+    updateItem(tempId, { searchQuery: query })
+
+    if (!query.trim()) {
+      updateItem(tempId, {
+        searchQuery: query,
+        productId: null, productName: '', barcode: '', brand: '',
+        categoryId: '', cost: '', isNew: false, description: '',
+      })
+      return
+    }
+
+    const q = query.toLowerCase()
+    const found = products.find(
+      (p) => p.barcode === query || p.name.toLowerCase().includes(q)
+    )
+
     if (found) {
       updateItem(tempId, {
+        searchQuery: query,
         productId: found.id, productName: found.name, barcode: found.barcode,
         brand: found.brand, categoryId: found.categoryId, cost: String(found.cost),
         isNew: false, description: found.description,
       })
     } else {
-      updateItem(tempId, { productId: null, barcode, isNew: true })
-    }
-  }, [products, updateItem])
-
-  const handleProductSelect = useCallback((tempId: string, productId: string) => {
-    const product = products.find((p) => p.id === productId)
-    if (product) {
       updateItem(tempId, {
-        productId: product.id, productName: product.name, barcode: product.barcode,
-        brand: product.brand, categoryId: product.categoryId, cost: String(product.cost),
-        isNew: false, description: product.description,
+        searchQuery: query,
+        productId: null, productName: query, barcode: '', brand: '',
+        categoryId: '', cost: '', isNew: true, description: '',
       })
     }
   }, [products, updateItem])
+
+  const clearItem = useCallback((tempId: string) => {
+    updateItem(tempId, {
+      productId: null, productName: '', barcode: '', brand: '',
+      categoryId: '', cost: '', isNew: false, description: '', searchQuery: '',
+    })
+  }, [updateItem])
 
   const handleSave = useCallback(() => {
     for (const item of items) {
@@ -115,11 +133,6 @@ export function Purchases() {
     setInvoiceDate(new Date().toISOString().split('T')[0])
     setItems([createEmptyItem()])
   }, [items, categories, addProduct, increaseStock, updateProduct])
-
-  const productOptions = useMemo(() =>
-    products.map((p) => ({ value: p.id, label: `${p.name} (${p.barcode})` })),
-    [products]
-  )
 
   const canPreview = items.some((i) => i.productName.trim() && parseInt(i.quantity, 10) > 0)
 
@@ -150,9 +163,15 @@ export function Purchases() {
         <div className="space-y-4">
           {items.map((item, index) => {
             const foundProduct = item.productId ? products.find((p) => p.id === item.productId) : null
+            const hasMatch = !!item.productId
+            const isTyping = item.searchQuery.trim().length > 0 && !hasMatch && !item.isNew
+            const showNewForm = item.isNew
+            const showExistingForm = hasMatch
+
             return (
-              <div key={item.tempId} className="rounded-lg border border-border bg-surface p-4">
-                <div className="flex items-center justify-between gap-2">
+              <div key={item.tempId} className="rounded-lg border border-border bg-surface p-4 space-y-3">
+                {/* Header */}
+                <div className="flex items-center justify-between">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.6px] text-muted">
                     Artículo #{index + 1}
                   </span>
@@ -163,101 +182,132 @@ export function Purchases() {
                   )}
                 </div>
 
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end">
-                  <div className="sm:col-span-2 lg:col-span-1">
-                    <Input
-                      label=""
-                      placeholder="Escanear código de barras..."
-                      value={item.barcode}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        updateItem(item.tempId, { barcode: val })
-                        if (val.length >= 4) handleBarcodeSearch(item.tempId, val)
-                      }}
-                      icon={<Barcode size={14} className="text-muted" />}
-                    />
-                  </div>
-                  <div>
-                    <Select
-                      label=""
-                      placeholder="O seleccionar existente"
-                      options={productOptions}
-                      value={item.productId ?? ''}
-                      onChange={(e) => handleProductSelect(item.tempId, e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Input
-                      label="Costo x unidad"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={item.cost}
-                      onChange={(e) => updateItem(item.tempId, { cost: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Input
-                      label="Cantidad"
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(item.tempId, { quantity: e.target.value })}
-                    />
-                  </div>
-                </div>
+                {/* Campo de búsqueda único */}
+                <Input
+                  label="Buscar producto"
+                  placeholder="Nombre o código de barras..."
+                  value={item.searchQuery}
+                  onChange={(e) => handleSearch(item.tempId, e.target.value)}
+                  icon={
+                    hasMatch
+                      ? <CheckCircle2 size={14} className="text-success-text" />
+                      : <Package size={14} className="text-muted" />
+                  }
+                />
 
-                <div className="mt-3">
-                  {item.isNew ? (
-                    <div className="grid grid-cols-1 gap-3 rounded-lg border border-dashed border-border-strong bg-card p-3 sm:grid-cols-2 lg:grid-cols-4">
-                      <div className="sm:col-span-2 lg:col-span-1">
-                        <Input
-                          label="Nombre del nuevo artículo *"
-                          value={item.productName}
-                          onChange={(e) => updateItem(item.tempId, { productName: e.target.value })}
-                          placeholder="Ej: Lapicera Bic Azul"
-                        />
-                      </div>
+                {/* Producto existente encontrado */}
+                {showExistingForm && (
+                  <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <Input
-                          label="Marca"
-                          value={item.brand}
-                          onChange={(e) => updateItem(item.tempId, { brand: e.target.value })}
-                          placeholder="Ej: Bic"
-                        />
+                        <p className="text-[13px] font-semibold text-text">{foundProduct?.name}</p>
+                        <div className="mt-1 flex items-center gap-2 flex-wrap">
+                          <code className="font-mono text-[10px] text-muted">{foundProduct?.barcode}</code>
+                          <Badge variant="success">Stock actual: {foundProduct?.stock} uds.</Badge>
+                          <Badge variant="default">Costo actual: {config.currency.symbol}{foundProduct?.cost.toFixed(2)}</Badge>
+                        </div>
                       </div>
-                      <div>
-                        <Select
-                          label="Categoría"
-                          options={catOptions}
-                          placeholder="Seleccionar"
-                          value={item.categoryId}
-                          onChange={(e) => updateItem(item.tempId, { categoryId: e.target.value })}
-                        />
-                      </div>
-                      <div className="sm:col-span-2 lg:col-span-1">
-                        <Input
-                          label="Descripción"
-                          value={item.description}
-                          onChange={(e) => updateItem(item.tempId, { description: e.target.value })}
-                          placeholder="Opcional"
-                        />
-                      </div>
-                      <div className="col-span-full">
-                        <Badge variant="warning">Nuevo producto — se creará al guardar</Badge>
-                      </div>
+                      <button
+                        onClick={() => clearItem(item.tempId)}
+                        className="text-[11px] text-muted hover:text-danger-text transition-colors shrink-0 ml-2"
+                      >
+                        Quitar
+                      </button>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
-                      <Search size={13} className="text-muted" />
-                      <span className="text-[13px] font-semibold text-text">{foundProduct?.name}</span>
-                      <code className="font-mono text-[10px] text-muted">{foundProduct?.barcode}</code>
-                      <Badge variant="success">
-                        Stock: {foundProduct?.stock} → {(foundProduct?.stock ?? 0) + (parseInt(item.quantity, 10) || 0)}
-                      </Badge>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        label="Nuevo costo x unidad"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={item.cost}
+                        onChange={(e) => updateItem(item.tempId, { cost: e.target.value })}
+                        placeholder={foundProduct?.cost.toFixed(2)}
+                      />
+                      <Input
+                        label="Cantidad a ingresar"
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(item.tempId, { quantity: e.target.value })}
+                      />
                     </div>
-                  )}
-                </div>
+                    {item.cost && item.quantity && (
+                      <p className="text-[11px] text-muted">
+                        Stock nuevo: <span className="font-semibold text-success-text">
+                          {(foundProduct?.stock ?? 0) + (parseInt(item.quantity, 10) || 0)} uds.
+                        </span>
+                        {' · '}Subtotal: <span className="font-semibold text-accent">
+                          {config.currency.symbol}{((parseFloat(item.cost) || 0) * (parseInt(item.quantity, 10) || 0)).toFixed(2)}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Nuevo producto */}
+                {showNewForm && (
+                  <div className="rounded-lg border border-dashed border-border-strong bg-card p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="warning">Nuevo producto — se creará al guardar</Badge>
+                      <button
+                        onClick={() => clearItem(item.tempId)}
+                        className="text-[11px] text-muted hover:text-danger-text transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <Input
+                        label="Nombre *"
+                        value={item.productName}
+                        onChange={(e) => updateItem(item.tempId, { productName: e.target.value })}
+                        placeholder="Ej: Lapicera Bic Azul"
+                      />
+                      <Input
+                        label="Código de barras"
+                        value={item.barcode}
+                        onChange={(e) => updateItem(item.tempId, { barcode: e.target.value })}
+                        placeholder="Opcional"
+                      />
+                      <Input
+                        label="Marca"
+                        value={item.brand}
+                        onChange={(e) => updateItem(item.tempId, { brand: e.target.value })}
+                        placeholder="Ej: Bic"
+                      />
+                      <Select
+                        label="Categoría"
+                        options={catOptions}
+                        placeholder="Seleccionar"
+                        value={item.categoryId}
+                        onChange={(e) => updateItem(item.tempId, { categoryId: e.target.value })}
+                      />
+                      <Input
+                        label="Costo x unidad"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={item.cost}
+                        onChange={(e) => updateItem(item.tempId, { cost: e.target.value })}
+                      />
+                      <Input
+                        label="Cantidad"
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(item.tempId, { quantity: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Hint cuando está escribiendo sin match */}
+                {isTyping && (
+                  <p className="text-[11px] text-muted">
+                    No se encontró el producto. Seguí escribiendo para crear uno nuevo.
+                  </p>
+                )}
               </div>
             )
           })}
