@@ -149,10 +149,10 @@ export function Sales() {
   }
 
   const saleColumns = [
-    { key: 'id', header: 'Venta', render: (s: Sale) => <span className="font-medium">#{s.id.slice(-4)}</span> },
+    { key: 'id', header: 'Venta', render: (s: Sale) => <span className={`font-medium ${s.status === 'voided' ? 'line-through text-muted' : ''}`}>#{s.id.slice(-4)}</span> },
     { key: 'status', header: 'Estado', render: (s: Sale) => statusBadge(s.status) },
-    { key: 'items', header: 'Productos', render: (s: Sale) => s.items.map((i) => `${i.productName} x${i.quantity}`).join(', ') },
-    { key: 'total', header: 'Total', render: (s: Sale) => <span className="font-semibold">{config.currency.symbol}{s.total.toFixed(2)}</span> },
+    { key: 'items', header: 'Productos', render: (s: Sale) => <span className={s.status === 'voided' ? 'line-through text-muted' : ''}>{s.items.map((i) => `${i.productName} x${i.quantity}`).join(', ')}</span> },
+    { key: 'total', header: 'Total', render: (s: Sale) => <span className={`font-semibold ${s.status === 'voided' ? 'line-through text-muted' : ''}`}>{config.currency.symbol}{s.total.toFixed(2)}</span> },
     { key: 'payment', header: 'Método', render: (s: Sale) => <Badge variant={paymentVariants[s.paymentMethod]}>{paymentLabels[s.paymentMethod]}</Badge> },
     { key: 'date', header: 'Fecha', render: (s: Sale) => new Date(s.createdAt).toLocaleDateString('es-ES', { dateStyle: 'medium' }) },
     {
@@ -181,15 +181,15 @@ export function Sales() {
           keyExtractor={(s) => s.id}
           emptyMessage="No hay ventas registradas"
           renderCard={(s) => (
-            <div className="space-y-2">
+            <div className={`space-y-2 ${s.status === 'voided' ? 'opacity-60' : ''}`}>
               <div className="flex items-center justify-between">
-                <span className="font-medium text-text">#{s.id.slice(-4)}</span>
+                <span className={`font-medium text-text ${s.status === 'voided' ? 'line-through' : ''}`}>#{s.id.slice(-4)}</span>
                 <div className="flex items-center gap-2">
                   {statusBadge(s.status)}
                   <Badge variant={paymentVariants[s.paymentMethod]}>{paymentLabels[s.paymentMethod]}</Badge>
                 </div>
               </div>
-              <div className="text-[12px] text-muted">
+              <div className={`text-[12px] ${s.status === 'voided' ? 'line-through text-muted' : 'text-muted'}`}>
                 {s.items.map((i) => `${i.productName} x${i.quantity}`).join(', ')}
               </div>
               <div className="flex items-center justify-between border-t border-border pt-2">
@@ -204,7 +204,7 @@ export function Sales() {
                     </button>
                   )}
                 </div>
-                <span className="font-semibold text-text">{config.currency.symbol}{s.total.toFixed(2)}</span>
+                <span className={`font-semibold text-text ${s.status === 'voided' ? 'line-through text-muted' : ''}`}>{config.currency.symbol}{s.total.toFixed(2)}</span>
               </div>
             </div>
           )}

@@ -45,6 +45,7 @@ export function Invoices() {
   const [defaultCategoryId, setDefaultCategoryId] = useState('')
   const [categoryError, setCategoryError] = useState('')
   const [fileHash, setFileHash] = useState('')
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
   const { products, add: addProduct, update: updateProduct, increaseStock } = useProducts()
   const { add: addPurchase } = usePurchases()
   const { invoices, add: addInvoice } = useInvoices()
@@ -158,6 +159,21 @@ export function Invoices() {
     const productIds = new Map<string, string>()
 
     try {
+      let imageUrl = ''
+      if (file) {
+        const ext = file.name.split('.').pop()
+        const path = `${crypto.randomUUID()}.${ext}`
+        const { error: uploadErr } = await supabase.storage
+          .from('invoice-files')
+          .upload(path, file)
+        if (uploadErr) {
+          toast.error('Error al guardar el archivo')
+          setSaving(false)
+          return
+        }
+        const { data: pub } = supabase.storage.from('invoice-files').getPublicUrl(path)
+        imageUrl = pub.publicUrl
+      }
       for (let i = 0; i < editItems.length; i++) {
         const item = editItems[i]
         const key = item.barcode || `__idx_${i}`
@@ -220,6 +236,7 @@ export function Invoices() {
         iva: result.iva,
         iibb: result.iibb,
         items: editItems as InvoiceItem[],
+        imageUrl,
         status: 'processed',
       })
       if (invoiceErr) throw new Error(`Error al guardar el historial: ${invoiceErr}`)
@@ -290,11 +307,12 @@ export function Invoices() {
                     <p className="text-[11px] text-muted">{(file.size / 1024).toFixed(1)} KB</p>
                     <div className="mt-3 flex gap-2">
                       <Button variant="gold" size="sm" onClick={handleAnalyze} disabled={analyzing}>
-                        {analyzing ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
-                        {analyzing ? 'Analizando...' : 'Analizar Factura'}
+                        {analyzing ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+                        <span className="hidden sm:inline">{analyzing ? 'Analizando...' : 'Analizar'}</span>
                       </Button>
                       <Button variant="surface" size="sm" onClick={reset} disabled={analyzing}>
-                        <X size={14} /> Cambiar archivo
+                        <X size={16} />
+                        <span className="hidden sm:inline">Cambiar</span>
                       </Button>
                     </div>
                   </div>
@@ -377,7 +395,8 @@ export function Invoices() {
             <p className="text-[15px] font-semibold text-text">Factura procesada correctamente</p>
             <p className="text-[12px] text-muted">Stock y compras actualizados</p>
             <Button variant="gold-outline" size="sm" onClick={reset}>
-              <Upload size={14} /> Analizar otra factura
+              <Upload size={16} />
+              <span className="hidden sm:inline">Analizar otra</span>
             </Button>
           </div>
         )}
@@ -491,6 +510,17 @@ export function Invoices() {
           <div className="space-y-3">
             {invoices.map((inv) => (
               <div key={inv.id} className="rounded-lg border border-border bg-surface p-4">
+                {inv.imageUrl && (
+                  <div className="mb-3">
+                    <button type="button" onClick={() => setPreviewImage(inv.imageUrl!)} className="cursor-pointer">
+                      <img
+                        src={inv.imageUrl}
+                        alt=""
+                        className="h-24 w-full rounded-lg border border-border object-cover transition-opacity hover:opacity-80"
+                      />
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-semibold text-text truncate">{inv.fileName}</p>
@@ -500,6 +530,9 @@ export function Invoices() {
                     <p className="text-[10px] text-muted mt-1">
                       {inv.items.length} artículo{inv.items.length !== 1 ? 's' : ''}
                     </p>
+                    {inv.userEmail && (
+                      <p className="text-[10px] text-muted mt-0.5">Registró: {inv.userEmail}</p>
+                    )}
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-[15px] font-bold text-accent">{config.currency.symbol}{inv.total.toFixed(2)}</p>
@@ -513,6 +546,26 @@ export function Invoices() {
           </div>
         )}
       </Card>
+
+      {/* Modal imagen ampliada */}
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            className="absolute right-4 top-4 z-10 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={previewImage}
+            alt=""
+            className="relative max-h-[90vh] max-w-full rounded-lg object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   )
 }

@@ -16,6 +16,7 @@ type InvoiceRow = {
   image_url: string | null
   status: string
   user_id: string | null
+  user_email: string | null
   created_at: string
 }
 
@@ -31,6 +32,7 @@ const mapRow = (row: InvoiceRow): Invoice => ({
   imageUrl: row.image_url ?? undefined,
   status: row.status as 'processed' | 'failed',
   userId: row.user_id ?? undefined,
+  userEmail: row.user_email ?? undefined,
   createdAt: new Date(row.created_at).getTime(),
 })
 
@@ -67,6 +69,8 @@ export function useInvoices() {
     imageUrl?: string
     status?: 'processed' | 'failed'
   }) => {
+    const { data: user } = await supabase.auth.getUser()
+    const userEmail = user?.user?.email ?? ''
     const { data, error: err } = await supabase
       .from('invoices')
       .insert({
@@ -79,6 +83,7 @@ export function useInvoices() {
         items: input.items as unknown as Record<string, unknown>,
         image_url: input.imageUrl ?? '',
         status: input.status ?? 'processed',
+        user_email: userEmail,
       })
       .select()
       .single()

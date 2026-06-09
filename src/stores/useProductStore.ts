@@ -9,8 +9,8 @@ interface ProductState {
   getProductById: (id: string) => Product | undefined
   getLowStockProducts: () => Product[]
   getProductsByCategory: (categoryId: string) => Product[]
-  reduceStock: (id: string, quantity: number) => void
-  increaseStock: (id: string, quantity: number) => void
+  reduceStock: (id: string, quantity: number, disable?: boolean) => void
+  increaseStock: (id: string, quantity: number, enable?: boolean) => void
 }
 
 export const useProductStore = create<ProductState>((set, get) => ({
@@ -43,16 +43,20 @@ export const useProductStore = create<ProductState>((set, get) => ({
     get().products.filter((p) => p.stock <= p.minStock),
   getProductsByCategory: (categoryId) =>
     get().products.filter((p) => p.categoryId === categoryId),
-  reduceStock: (id, quantity) =>
+  reduceStock: (id, quantity, disable) =>
     set((state) => ({
       products: state.products.map((p) =>
-        p.id === id ? { ...p, stock: p.stock - quantity, updatedAt: Date.now() } : p
+        p.id === id
+          ? { ...p, stock: p.stock - quantity, enabled: disable ? false : p.enabled, updatedAt: Date.now() }
+          : p
       ),
     })),
-  increaseStock: (id, quantity) =>
+  increaseStock: (id, quantity, enable) =>
     set((state) => ({
       products: state.products.map((p) =>
-        p.id === id ? { ...p, stock: p.stock + quantity, updatedAt: Date.now() } : p
+        p.id === id
+          ? { ...p, stock: p.stock + quantity, enabled: enable ? true : p.enabled, updatedAt: Date.now() }
+          : p
       ),
     })),
 }))

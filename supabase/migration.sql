@@ -196,3 +196,30 @@ alter table purchases add column iva numeric not null default 0;
 alter table purchases add column iibb numeric not null default 0;
 alter table invoices add column iva numeric not null default 0;
 alter table invoices add column iibb numeric not null default 0;
+alter table invoices add column user_email text not null default '';
+
+-- 9. STORAGE: bucket para archivos de facturas --------------------
+
+insert into storage.buckets (id, name, public)
+values ('invoice-files', 'invoice-files', true)
+on conflict (id) do nothing;
+
+create policy "auth_invoice_files_select"
+  on storage.objects for select using (
+    bucket_id = 'invoice-files' and auth.role() = 'authenticated'
+  );
+
+create policy "auth_invoice_files_insert"
+  on storage.objects for insert with check (
+    bucket_id = 'invoice-files' and auth.role() = 'authenticated'
+  );
+
+create policy "auth_invoice_files_update"
+  on storage.objects for update using (
+    bucket_id = 'invoice-files' and auth.role() = 'authenticated'
+  );
+
+create policy "auth_invoice_files_delete"
+  on storage.objects for delete using (
+    bucket_id = 'invoice-files' and auth.role() = 'authenticated'
+  );

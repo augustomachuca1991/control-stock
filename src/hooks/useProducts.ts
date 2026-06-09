@@ -140,15 +140,18 @@ export function useProducts() {
     }
 
     const newStock = product.stock - quantity
+    const payload: Record<string, unknown> = { stock: newStock }
+    if (newStock <= 0) payload.enabled = false
+
     const { error: err } = await supabase
       .from('products')
-      .update({ stock: newStock })
+      .update(payload)
       .eq('id', id)
     if (err) {
       toast.error(err.message)
       return { error: err.message }
     }
-    useProductStore.getState().reduceStock(id, quantity)
+    useProductStore.getState().reduceStock(id, quantity, newStock <= 0)
     return {}
   }, [])
 
@@ -164,15 +167,19 @@ export function useProducts() {
     }
 
     const newStock = product.stock + quantity
+    const payload: Record<string, unknown> = { stock: newStock }
+    const wasZero = product.stock <= 0 && newStock > 0
+    if (wasZero) payload.enabled = true
+
     const { error: err } = await supabase
       .from('products')
-      .update({ stock: newStock })
+      .update(payload)
       .eq('id', id)
     if (err) {
       toast.error(err.message)
       return { error: err.message }
     }
-    useProductStore.getState().increaseStock(id, quantity)
+    useProductStore.getState().increaseStock(id, quantity, wasZero)
     return {}
   }, [])
 

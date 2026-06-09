@@ -104,9 +104,9 @@ export function Products() {
   const categoryName = useCallback((id: string) => categories.find((c) => c.id === id)?.name ?? '-', [categories])
 
   const columns = [
-    { key: 'image', header: '', render: (p: Product) => <ProductThumb src={p.images?.[0]} className="h-10 w-10" /> },
-    { key: 'name', header: 'Nombre', render: (p: Product) => <span className="font-semibold text-text">{p.name}</span> },
-    { key: 'brand', header: 'Marca', render: (p: Product) => <span className="text-muted-light">{p.brand}</span> },
+    { key: 'image', header: '', render: (p: Product) => <ProductThumb src={p.images?.[0]} className={`h-10 w-10 ${p.stock === 0 ? 'opacity-50' : ''}`} /> },
+    { key: 'name', header: 'Nombre', render: (p: Product) => <span className={`font-semibold ${p.stock === 0 ? 'line-through text-muted' : 'text-text'}`}>{p.name}</span> },
+    { key: 'brand', header: 'Marca', render: (p: Product) => <span className={p.stock === 0 ? 'line-through text-muted' : 'text-muted-light'}>{p.brand}</span> },
     { key: 'enabled', header: 'Estado', render: (p: Product) => p.enabled ? <Badge variant="success">Activo</Badge> : <Badge variant="danger">Inactivo</Badge> },
     {
       key: 'category', header: 'Categoría',
@@ -114,12 +114,12 @@ export function Products() {
     },
     {
       key: 'price', header: `Precio (${config.currency.code})`,
-      render: (p: Product) => <span className="font-semibold text-accent">{config.currency.symbol}{p.price.toFixed(2)}</span>,
+      render: (p: Product) => <span className={`font-semibold ${p.stock === 0 ? 'line-through text-muted' : 'text-accent'}`}>{config.currency.symbol}{p.price.toFixed(2)}</span>,
     },
     {
       key: 'stock', header: 'Stock',
       render: (p: Product) => (
-        <span className={p.stock <= p.minStock ? 'font-bold text-danger-text' : 'text-text'}>{p.stock} uds.</span>
+        <span className={p.stock <= p.minStock && p.stock > 0 ? 'font-bold text-danger-text' : p.stock === 0 ? 'line-through text-muted' : 'text-text'}>{p.stock} uds.</span>
       ),
     },
     {
@@ -173,13 +173,13 @@ export function Products() {
           emptyMessage="No se encontraron productos"
           onRowClick={openDetail}
           renderCard={(p) => (
-            <div className="flex items-start gap-3">
+            <div className={`flex items-start gap-3 ${p.stock === 0 ? 'opacity-60' : ''}`}>
               <ProductThumb src={p.images?.[0]} className="h-14 w-14 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-semibold text-text">{p.name}</p>
-                    <p className="text-[11px] text-muted">{p.brand}</p>
+                    <p className={`font-semibold ${p.stock === 0 ? 'line-through text-muted' : 'text-text'}`}>{p.name}</p>
+                    <p className={`text-[11px] ${p.stock === 0 ? 'line-through text-muted' : 'text-muted'}`}>{p.brand}</p>
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <Button variant="surface" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(e, p.id) }}>
@@ -192,10 +192,10 @@ export function Products() {
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
                   {!p.enabled && <Badge variant="danger">Deshabilitado</Badge>}
                   <Badge variant="default">{categoryName(p.categoryId)}</Badge>
-                  <span className="font-bold text-accent">{config.currency.symbol}{p.price.toFixed(2)}</span>
-                  <span className={p.stock <= p.minStock ? 'font-bold text-danger-text' : 'text-muted-light'}>{p.stock} uds.</span>
+                  <span className={`font-bold ${p.stock === 0 ? 'line-through text-muted' : 'text-accent'}`}>{config.currency.symbol}{p.price.toFixed(2)}</span>
+                  <span className={p.stock <= p.minStock && p.stock > 0 ? 'font-bold text-danger-text' : p.stock === 0 ? 'line-through text-muted' : 'text-muted-light'}>{p.stock} uds.</span>
                 </div>
-                <code className="mt-1 inline-block rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted">{p.barcode}</code>
+                <code className={`mt-1 inline-block rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] ${p.stock === 0 ? 'line-through text-muted' : 'text-muted'}`}>{p.barcode}</code>
               </div>
             </div>
           )}

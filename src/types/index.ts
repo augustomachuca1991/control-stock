@@ -63,6 +63,7 @@ export interface Invoice {
   imageUrl?: string
   status: 'processed' | 'failed'
   userId?: string
+  userEmail?: string
   createdAt: number
 }
 

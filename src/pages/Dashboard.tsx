@@ -100,21 +100,21 @@ export function Dashboard() {
       key: 'id',
       header: 'Venta',
       render: (s: Sale) => (
-        <span className="font-mono text-[11px] text-primary-light">#{s.id.slice(-4)}</span>
+        <span className={`font-mono text-[11px] ${s.status === 'voided' ? 'line-through text-muted' : 'text-primary-light'}`}>#{s.id.slice(-4)}</span>
       ),
     },
     {
       key: 'items',
       header: 'Items',
       render: (s: Sale) => (
-        <span className="text-muted-light">{s.items.length} producto{s.items.length !== 1 ? 's' : ''}</span>
+        <span className={s.status === 'voided' ? 'line-through text-muted' : 'text-muted-light'}>{s.items.length} producto{s.items.length !== 1 ? 's' : ''}</span>
       ),
     },
     {
       key: 'total',
       header: 'Total',
       render: (s: Sale) => (
-        <span className="font-bold text-accent">
+        <span className={`font-bold ${s.status === 'voided' ? 'line-through text-muted' : 'text-accent'}`}>
           {config.currency.symbol}{s.total.toFixed(2)}
         </span>
       ),
@@ -136,7 +136,7 @@ export function Dashboard() {
       key: 'date',
       header: 'Fecha',
       render: (s: Sale) => (
-        <span className="text-muted">{new Date(s.createdAt).toLocaleDateString('es-ES')}</span>
+        <span className={`text-muted ${s.status === 'voided' ? 'line-through' : ''}`}>{new Date(s.createdAt).toLocaleDateString('es-ES')}</span>
       ),
     },
   ]

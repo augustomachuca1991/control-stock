@@ -32,7 +32,7 @@ export const resetPasswordSchema = yup.object({
 export const productSchema = yup.object({
   name: requiredString,
   brand: requiredString,
-  barcode: requiredString,
+  barcode: yup.string(),
   categoryId: yup.string().required('Seleccioná una categoría'),
   price: yup.number().typeError('Debe ser un número').min(0, 'Mínimo 0').required('Requerido'),
   cost: yup.number().typeError('Debe ser un número').min(0, 'Mínimo 0').required('Requerido'),
