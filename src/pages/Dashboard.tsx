@@ -81,17 +81,17 @@ export function Dashboard() {
 
   const products        = useProductStore((s) => s.products)
   const lowStock        = useMemo(() => products.filter((p) => p.stock <= p.minStock), [products])
-  const getTotalRevenue = useSaleStore((s) => s.getTotalRevenue)
-  const getSalesCount   = useSaleStore((s) => s.getSalesCount)
+  const totalSales      = useSaleStore((s) => s.getSalesCount())
+  const revenue         = useSaleStore((s) => s.getTotalRevenue())
   const sales           = useSaleStore((s) => s.sales)
   const getCategoryById = useCategoryStore((s) => s.getCategoryById)
 
   const stats = useMemo(() => ({
     totalProducts: products.length,
-    totalSales:    getSalesCount(),
-    revenue:       getTotalRevenue(),
+    totalSales,
+    revenue,
     lowStockCount: lowStock.length,
-  }), [products.length, getSalesCount, getTotalRevenue, lowStock.length])
+  }), [products.length, totalSales, revenue, lowStock.length])
 
   const recentSales = useMemo(() => sales.slice(0, 5), [sales])
 
