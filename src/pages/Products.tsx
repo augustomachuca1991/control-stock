@@ -52,6 +52,7 @@ export function Products() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<Product | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
   const barcodeRef = useRef<HTMLInputElement>(null)
 
   useCategories()
@@ -247,44 +248,55 @@ export function Products() {
 
                 {/* Imágenes */}
                 <div className="sm:col-span-2 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.6px] text-muted">Imágenes (opcional)</span>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0]
-                          if (!file) return
-                          const { url } = await uploadImage(file)
-                          if (url) setFieldValue('images', [...values.images, url])
-                          e.target.value = ''
-                        }}
-                        className="hidden"
-                        id="product-image-upload"
-                      />
-                      <Button variant="gold-outline" size="sm" type="button" onClick={() => document.getElementById('product-image-upload')?.click()}>
-                        <Upload size={13} /> Subir imagen
-                      </Button>
-                      <Button variant="surface" size="sm" type="button" onClick={() => setFieldValue('images', [...values.images, ''])}>
-                        <Plus size={13} /> Agregar URL
-                      </Button>
-                    </div>
-                  </div>
-                  {values.images.map((url, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <Input value={url} onChange={(e) => {
-                          const imgs = [...values.images]; imgs[i] = e.target.value; setFieldValue('images', imgs)
-                        }} placeholder="https://..." />
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.6px] text-muted">Imágenes (opcional)</span>
+                      <div className="flex gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (!file) return
+                            const { url } = await uploadImage(file)
+                            if (url) setFieldValue('images', [...values.images, url])
+                            e.target.value = ''
+                          }}
+                          className="hidden"
+                          id="product-image-upload"
+                        />
+                        <Button variant="gold-outline" size="sm" type="button" onClick={() => document.getElementById('product-image-upload')?.click()}>
+                          <Upload size={13} /> Subir imagen
+                        </Button>
+                        <Button variant="surface" size="sm" type="button" onClick={() => setFieldValue('images', [...values.images, ''])}>
+                          <Plus size={13} /> Agregar URL
+                        </Button>
                       </div>
-                      <ProductThumb src={url} className="h-9 w-9 shrink-0" />
-                      <Button variant="surface" size="sm" onClick={() => setFieldValue('images', values.images.filter((_, j) => j !== i))}>
-                        <X size={13} className="text-danger-text" />
-                      </Button>
                     </div>
-                  ))}
-                  {values.images.length === 0 && <p className="text-[11px] text-muted">Sin imágenes. Podés subir o pegar URLs.</p>}
+                    {values.images.map((url, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <input
+                            value={url}
+                            onChange={(e) => {
+                              const imgs = [...values.images]; imgs[i] = e.target.value; setFieldValue('images', imgs)
+                            }}
+                            placeholder="https://..."
+                            className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-[13px] text-text placeholder:text-muted transition-colors focus:border-border-strong focus:outline-none"
+                          />
+                        </div>
+                        <ProductThumb src={url} className="h-9 w-9 shrink-0" />
+                        <button
+                          type="button"
+                          onClick={() => setFieldValue('images', values.images.filter((_, j) => j !== i))}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-muted hover:text-danger-text transition-colors"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                    {values.images.length === 0 && <p className="text-[11px] text-muted">Sin imágenes. Podés subir o pegar URLs.</p>}
+                  </div>
                 </div>
 
                 <div className="sm:col-span-2 flex items-center gap-3 pt-2">
@@ -330,7 +342,11 @@ export function Products() {
           <div className="space-y-5">
             {selectedProduct.images && selectedProduct.images.length > 0 ? (
               <div className="flex flex-wrap gap-3">
-                {selectedProduct.images.map((img, i) => <img key={i} src={img} alt="" className="h-32 w-32 rounded-lg border border-border object-cover" />)}
+                {selectedProduct.images.map((img, i) => (
+                  <button key={i} type="button" onClick={() => setPreviewImage(img)} className="cursor-pointer">
+                    <img src={img} alt="" className="h-32 w-32 rounded-lg border border-border object-cover transition-opacity hover:opacity-80" />
+                  </button>
+                ))}
               </div>
             ) : (
               <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-surface px-4 py-5">
@@ -372,6 +388,26 @@ export function Products() {
           </div>
         )}
       </Modal>
+
+      {/* Modal imagen ampliada */}
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            className="absolute right-4 top-4 z-10 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={previewImage}
+            alt=""
+            className="relative max-h-[90vh] max-w-full rounded-lg object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </>
   )
 }
