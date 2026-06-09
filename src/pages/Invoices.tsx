@@ -158,8 +158,12 @@ export function Invoices() {
     const productIds = new Map<string, string>()
 
     try {
-      for (const item of editItems) {
-        const existing = products.find((p) => p.barcode === item.barcode)
+      for (let i = 0; i < editItems.length; i++) {
+        const item = editItems[i]
+        const key = item.barcode || `__idx_${i}`
+        const existing = item.barcode
+          ? products.find((p) => p.barcode === item.barcode)
+          : undefined
 
         if (existing) {
           const { error: stockErr } = await increaseStock(existing.id, item.quantity)
@@ -168,7 +172,7 @@ export function Invoices() {
             const { error: costErr } = await updateProduct(existing.id, { cost: item.unitCost })
             if (costErr) throw new Error(`Error al actualizar costo de ${item.productName}: ${costErr}`)
           }
-          productIds.set(item.barcode, existing.id)
+          productIds.set(key, existing.id)
         } else {
           const { data, error } = await addProduct({
             name: item.productName,
@@ -186,13 +190,13 @@ export function Invoices() {
           if (error) throw new Error(`Error al crear producto ${item.productName}: ${error}`)
           if (data) {
             const created = data as { id: string }
-            productIds.set(item.barcode, created.id)
+            productIds.set(key, created.id)
           }
         }
       }
 
-      const purchaseItems: PurchaseItem[] = editItems.map((item) => ({
-        productId: productIds.get(item.barcode) ?? '',
+      const purchaseItems: PurchaseItem[] = editItems.map((item, i) => ({
+        productId: productIds.get(item.barcode || `__idx_${i}`) ?? '',
         productName: item.productName,
         barcode: item.barcode,
         quantity: item.quantity,
@@ -224,11 +228,12 @@ export function Invoices() {
       setSaved(true)
       setConfirmOpen(false)
     } catch (e) {
+      console.error('handleConfirm error:', e)
       toast.error(e instanceof Error ? e.message : 'Error desconocido')
     } finally {
       setSaving(false)
     }
-  }, [result, editItems, editDate, products, defaultCategoryId, addProduct, increaseStock, updateProduct, addPurchase])
+  }, [result, editItems, editDate, file, products, defaultCategoryId, addProduct, increaseStock, updateProduct, addPurchase, addInvoice])
 
   const reset = useCallback(() => {
     setFile(null)
