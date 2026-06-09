@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { toast } from 'sonner'
 import { useSaleStore } from '../stores/useSaleStore'
 import type { Sale, SaleItem, PaymentMethod } from '../types'
 
@@ -46,7 +47,10 @@ export function useSales() {
       })
       .select()
       .single()
-    if (err) return { error: err.message }
+    if (err) {
+      toast.error(err.message)
+      return { error: err.message }
+    }
     if (data) {
       const sale: Sale = {
         id: data.id,
@@ -69,7 +73,10 @@ export function useSales() {
       .from('sales')
       .update({ status: 'voided' })
       .eq('id', id)
-    if (err) return { error: err.message }
+    if (err) {
+      toast.error(err.message)
+      return { error: err.message }
+    }
     useSaleStore.getState().voidSale(id)
     return {}
   }, [])

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { toast } from 'sonner'
 import { useProductStore } from '../stores/useProductStore'
 import type { Product } from '../types'
 
@@ -51,7 +52,10 @@ export function useProducts() {
       })
       .select()
       .single()
-    if (err) return { error: err.message }
+    if (err) {
+      toast.error(err.message)
+      return { error: err.message }
+    }
     if (data) {
       useProductStore.setState((state) => ({
         products: [...state.products, data as unknown as Product],
@@ -75,14 +79,20 @@ export function useProducts() {
     if (input.enabled !== undefined) payload.enabled = input.enabled
 
     const { error: err } = await supabase.from('products').update(payload).eq('id', id)
-    if (err) return { error: err.message }
+    if (err) {
+      toast.error(err.message)
+      return { error: err.message }
+    }
     useProductStore.getState().updateProduct(id, input)
     return {}
   }, [])
 
   const remove = useCallback(async (id: string) => {
     const { error: err } = await supabase.from('products').delete().eq('id', id)
-    if (err) return { error: err.message }
+    if (err) {
+      toast.error(err.message)
+      return { error: err.message }
+    }
     useProductStore.getState().deleteProduct(id)
     return {}
   }, [])
@@ -95,7 +105,10 @@ export function useProducts() {
       .from(BUCKET)
       .upload(path, file)
 
-    if (uploadErr) return { error: uploadErr.message }
+    if (uploadErr) {
+      toast.error(uploadErr.message)
+      return { error: uploadErr.message }
+    }
 
     const { data: publicUrl } = supabase.storage
       .from(BUCKET)
@@ -110,14 +123,20 @@ export function useProducts() {
       .select('stock')
       .eq('id', id)
       .single()
-    if (!product) return { error: 'Product not found' }
+    if (!product) {
+      toast.error('Producto no encontrado')
+      return { error: 'Product not found' }
+    }
 
     const newStock = product.stock - quantity
     const { error: err } = await supabase
       .from('products')
       .update({ stock: newStock })
       .eq('id', id)
-    if (err) return { error: err.message }
+    if (err) {
+      toast.error(err.message)
+      return { error: err.message }
+    }
     useProductStore.getState().reduceStock(id, quantity)
     return {}
   }, [])
@@ -128,14 +147,20 @@ export function useProducts() {
       .select('stock')
       .eq('id', id)
       .single()
-    if (!product) return { error: 'Product not found' }
+    if (!product) {
+      toast.error('Producto no encontrado')
+      return { error: 'Product not found' }
+    }
 
     const newStock = product.stock + quantity
     const { error: err } = await supabase
       .from('products')
       .update({ stock: newStock })
       .eq('id', id)
-    if (err) return { error: err.message }
+    if (err) {
+      toast.error(err.message)
+      return { error: err.message }
+    }
     useProductStore.getState().increaseStock(id, quantity)
     return {}
   }, [])

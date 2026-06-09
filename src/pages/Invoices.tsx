@@ -5,6 +5,12 @@ import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Modal } from '../components/ui/Modal'
 import { config } from '../config'
+import { toast } from 'sonner'
+import { Select } from '../components/ui/Select'
+import { useProducts } from '../hooks/useProducts'
+import { usePurchases } from '../hooks/usePurchases'
+import { useCategoryStore } from '../stores/useCategoryStore'
+import type { PurchaseItem } from '../types'
 
 interface DetectedItem {
   productName: string
@@ -28,6 +34,10 @@ export function Invoices() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [defaultCategoryId, setDefaultCategoryId] = useState('')
+  const { products, add: addProduct, update: updateProduct, increaseStock } = useProducts()
+  const { add: addPurchase } = usePurchases()
+  const categories = useCategoryStore((s) => s.categories)
   const inputRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
 
@@ -83,6 +93,7 @@ export function Invoices() {
         })
       }
     } catch {
+      toast.error('Error al analizar la factura')
       setAnalyzing(false)
       return
     }
@@ -92,19 +103,67 @@ export function Invoices() {
   const handleConfirm = useCallback(async () => {
     if (!result) return
     setSaving(true)
-    if (config.invoiceWebhookUrl) {
-      await fetch(config.invoiceWebhookUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'confirm', ...result }),
+
+    const productIds = new Map<string, string>()
+
+    try {
+      for (const item of result.items) {
+        const existing = products.find((p) => p.barcode === item.barcode)
+
+        if (existing) {
+          const { error: stockErr } = await increaseStock(existing.id, item.quantity)
+          if (stockErr) throw new Error(`Error al actualizar stock de ${item.productName}: ${stockErr}`)
+          if (existing.cost !== item.unitCost) {
+            const { error: costErr } = await updateProduct(existing.id, { cost: item.unitCost })
+            if (costErr) throw new Error(`Error al actualizar costo de ${item.productName}: ${costErr}`)
+          }
+          productIds.set(item.barcode, existing.id)
+        } else {
+          const { data, error } = await addProduct({
+            name: item.productName,
+            brand: '',
+            barcode: item.barcode,
+            categoryId: defaultCategoryId,
+            price: 0,
+            cost: item.unitCost,
+            stock: item.quantity,
+            minStock: 0,
+            description: '',
+            images: [],
+            enabled: false,
+          })
+          if (error) throw new Error(`Error al crear producto ${item.productName}: ${error}`)
+          if (data) {
+            const created = data as { id: string }
+            productIds.set(item.barcode, created.id)
+          }
+        }
+      }
+
+      const purchaseItems: PurchaseItem[] = result.items.map((item) => ({
+        productId: productIds.get(item.barcode) ?? '',
+        productName: item.productName,
+        barcode: item.barcode,
+        quantity: item.quantity,
+        cost: item.unitCost,
+      }))
+
+      const { error: purchaseErr } = await addPurchase({
+        items: purchaseItems,
+        total: result.total,
+        date: result.date,
       })
-    } else {
-      await new Promise((r) => setTimeout(r, 800))
+      if (purchaseErr) throw new Error(`Error al registrar la compra: ${purchaseErr}`)
+
+      toast.success('Factura procesada correctamente')
+      setSaved(true)
+      setConfirmOpen(false)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error desconocido')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
-    setSaved(true)
-    setConfirmOpen(false)
-  }, [result])
+  }, [result, products, defaultCategoryId, addProduct, increaseStock, updateProduct, addPurchase])
 
   const reset = useCallback(() => {
     setFile(null)
@@ -263,6 +322,18 @@ export function Invoices() {
                 <p className="mt-1">Se crearán los productos nuevos, se actualizará el stock de los existentes y se registrará la compra en el historial.</p>
               </div>
             </div>
+
+            {categories.length > 0 && (
+              <div className="w-full sm:w-72">
+                <Select
+                  label="Categoría para productos nuevos"
+                  options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                  value={defaultCategoryId}
+                  onChange={(e) => setDefaultCategoryId(e.target.value)}
+                  placeholder="Seleccionar categoría..."
+                />
+              </div>
+            )}
 
             <div className="rounded-lg border border-border divide-y divide-border/50">
               {result.items.map((item, i) => (

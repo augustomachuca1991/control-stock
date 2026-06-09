@@ -155,15 +155,16 @@ export function Sales() {
     { key: 'total', header: 'Total', render: (s: Sale) => <span className="font-semibold">{config.currency.symbol}{s.total.toFixed(2)}</span> },
     { key: 'payment', header: 'Método', render: (s: Sale) => <Badge variant={paymentVariants[s.paymentMethod]}>{paymentLabels[s.paymentMethod]}</Badge> },
     { key: 'date', header: 'Fecha', render: (s: Sale) => new Date(s.createdAt).toLocaleDateString('es-ES', { dateStyle: 'medium' }) },
-    { key: 'actions', header: '', render: (s: Sale) =>
-      s.status === 'active' ? (
-        <button
-          onClick={(e) => { e.stopPropagation(); setSaleToVoid(s); setVoidConfirmOpen(true) }}
-          className="text-[11px] text-danger-text hover:underline transition-colors"
-        >
-          Anular
-        </button>
-      ) : null
+    {
+      key: 'actions', header: '', render: (s: Sale) =>
+        s.status === 'active' ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); setSaleToVoid(s); setVoidConfirmOpen(true) }}
+            className="text-[11px] text-danger-text hover:underline transition-colors"
+          >
+            Anular
+          </button>
+        ) : null
     },
   ]
 
@@ -228,21 +229,21 @@ export function Sales() {
             <Form>
               <div className="space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end">
-                    <div className="flex-1">
-                      <SearchSelect
-                        label="Producto"
-                        options={productOptions}
-                        value={selectedProductId}
-                        onChange={setSelectedProductId}
-                        placeholder="Buscar por nombre o código de barras..."
-                      />
-                    </div>
-                    <div className="w-full sm:w-24">
-                      <Input ref={quantityRef} label="Cant." type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-                    </div>
+                  <div className="flex-1">
+                    <SearchSelect
+                      label="Producto"
+                      options={productOptions}
+                      value={selectedProductId}
+                      onChange={setSelectedProductId}
+                      placeholder="Buscar por nombre o código de barras..."
+                    />
                   </div>
-                  <Button onClick={addToCart} disabled={!selectedProductId}><Plus size={16} /> Agregar</Button>
+                  <div className="w-full sm:w-24">
+                    <Input ref={quantityRef} label="Cant." type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+                  </div>
+                  <div className="sm:mb-[23px]">
+                    <Button onClick={addToCart} disabled={!selectedProductId}><Plus size={16} /> Agregar</Button>
+                  </div>
                 </div>
 
                 {cart.length > 0 && (

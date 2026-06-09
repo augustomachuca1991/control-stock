@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { toast } from 'sonner'
 import { usePurchaseStore } from '../stores/usePurchaseStore'
 import type { PurchaseItem } from '../types'
 
@@ -57,7 +58,10 @@ export function usePurchases() {
       })
       .select()
       .single()
-    if (err) return { error: err.message }
+    if (err) {
+      toast.error(err.message)
+      return { error: err.message }
+    }
     if (data) {
       const row = data as unknown as PurchaseRow
       usePurchaseStore.setState((state) => ({

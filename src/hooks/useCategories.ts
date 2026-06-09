@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { toast } from 'sonner'
 import { useCategoryStore } from '../stores/useCategoryStore'
 import type { Category } from '../types'
 
@@ -30,7 +31,10 @@ export function useCategories() {
       .insert({ name: input.name, description: input.description })
       .select()
       .single()
-    if (err) return { error: err.message }
+    if (err) {
+      toast.error(err.message)
+      return { error: err.message }
+    }
     if (data) {
       useCategoryStore.setState((state) => ({
         categories: [...state.categories, data],
@@ -44,7 +48,10 @@ export function useCategories() {
       .from('categories')
       .update(input)
       .eq('id', id)
-    if (err) return { error: err.message }
+    if (err) {
+      toast.error(err.message)
+      return { error: err.message }
+    }
     useCategoryStore.getState().updateCategory(id, input)
     return {}
   }, [])
@@ -54,7 +61,10 @@ export function useCategories() {
       .from('categories')
       .delete()
       .eq('id', id)
-    if (err) return { error: err.message }
+    if (err) {
+      toast.error(err.message)
+      return { error: err.message }
+    }
     useCategoryStore.getState().deleteCategory(id)
     return {}
   }, [])
