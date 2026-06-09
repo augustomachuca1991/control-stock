@@ -11,13 +11,16 @@ export function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const { resetPassword } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email.trim()) return
     setError('')
+    setLoading(true)
     const { error: err } = await resetPassword(email)
+    setLoading(false)
     if (err) setError(err.message)
     else setSent(true)
   }
@@ -65,8 +68,8 @@ export function ForgotPassword() {
                 <p className="text-[12px] text-danger-text text-center">{error}</p>
               )}
 
-              <Button variant="gold" className="w-full" type="submit">
-                <Send size={15} /> Enviar enlace
+              <Button variant="gold" className="w-full" type="submit" disabled={loading}>
+                <Send size={15} /> {loading ? 'Enviando...' : 'Enviar enlace'}
               </Button>
 
               <Link

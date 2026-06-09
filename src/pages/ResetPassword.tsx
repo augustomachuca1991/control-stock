@@ -12,6 +12,7 @@ export function ResetPassword() {
   const [confirm, setConfirm] = useState('')
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const { updatePassword } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,7 +20,9 @@ export function ResetPassword() {
     if (!password) return
     if (password !== confirm) { setError('Las contraseñas no coinciden'); return }
     setError('')
+    setLoading(true)
     const { error: err } = await updatePassword(password)
+    setLoading(false)
     if (err) setError(err.message)
     else setDone(true)
   }
@@ -75,8 +78,8 @@ export function ResetPassword() {
                 <p className="text-[12px] text-danger-text text-center">{error}</p>
               )}
 
-              <Button variant="gold" className="w-full" type="submit">
-                <KeyRound size={15} /> Restablecer contraseña
+              <Button variant="gold" className="w-full" type="submit" disabled={loading}>
+                <KeyRound size={15} /> {loading ? 'Restableciendo...' : 'Restablecer contraseña'}
               </Button>
 
               <Link

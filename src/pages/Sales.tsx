@@ -34,6 +34,7 @@ export function Sales() {
   const [lastSale, setLastSale] = useState<Sale | null>(null)
   const [voidConfirmOpen, setVoidConfirmOpen] = useState(false)
   const [saleToVoid, setSaleToVoid] = useState<Sale | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const quantityRef = useRef<HTMLInputElement>(null)
 
   const products = useProductStore((s) => s.products)
@@ -92,6 +93,7 @@ export function Sales() {
   )
 
   const handleConfirmSale = useCallback(async () => {
+    setConfirming(true)
     const { data: sale } = await createSale({
       items: cart.map((c) => ({
         productId: c.productId,
@@ -105,16 +107,21 @@ export function Sales() {
       await Promise.all(cart.map((c) => reduceStock(c.productId, c.quantity)))
       setLastSale(sale)
     }
+    setConfirming(false)
     setPreviewOpen(false)
     setModalOpen(false)
     setCart([])
     if (sale) setReceiptOpen(true)
   }, [cart, paymentMethod, createSale, reduceStock])
 
+  const [voiding, setVoiding] = useState(false)
+
   const handleVoidSale = useCallback(async () => {
     if (!saleToVoid) return
+    setVoiding(true)
     await Promise.all(saleToVoid.items.map((item) => increaseStock(item.productId, item.quantity)))
     await voidSale(saleToVoid.id)
+    setVoiding(false)
     setVoidConfirmOpen(false)
     setSaleToVoid(null)
   }, [saleToVoid, increaseStock, voidSale])
@@ -202,22 +209,22 @@ export function Sales() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nueva Venta" size="lg">
         <div className="space-y-4">
 
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <SearchSelect
-                label="Producto"
-                options={productOptions}
-                value={selectedProductId}
-                onChange={setSelectedProductId}
-                placeholder="Buscar por nombre o código de barras..."
-              />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <SearchSelect
+                  label="Producto"
+                  options={productOptions}
+                  value={selectedProductId}
+                  onChange={setSelectedProductId}
+                  placeholder="Buscar por nombre o código de barras..."
+                />
+              </div>
+              <div className="w-full sm:w-24">
+                <Input ref={quantityRef} label="Cant." type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+              </div>
             </div>
-            <div className="w-24">
-              <Input ref={quantityRef} label="Cant." type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={addToCart} disabled={!selectedProductId}><Plus size={16} /> Agregar</Button>
-            </div>
+            <Button onClick={addToCart} disabled={!selectedProductId}><Plus size={16} /> Agregar</Button>
           </div>
 
           {cart.length > 0 && (
@@ -313,7 +320,9 @@ export function Sales() {
 
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="gold-outline" onClick={() => setPreviewOpen(false)}>Volver</Button>
-          <Button variant="gold" onClick={handleConfirmSale}>Confirmar y Emitir Comprobante</Button>
+          <Button variant="gold" onClick={handleConfirmSale} disabled={confirming}>
+            {confirming ? 'Procesando...' : 'Confirmar y Emitir Comprobante'}
+          </Button>
         </div>
       </Modal>
 
@@ -398,8 +407,8 @@ export function Sales() {
               <Button variant="gold-outline" onClick={() => { setVoidConfirmOpen(false); setSaleToVoid(null) }}>
                 Cancelar
               </Button>
-              <Button variant="surface" onClick={handleVoidSale}>
-                <AlertCircle size={14} /> Confirmar Anulación
+              <Button variant="surface" onClick={handleVoidSale} disabled={voiding}>
+                <AlertCircle size={14} /> {voiding ? 'Anulando...' : 'Confirmar Anulación'}
               </Button>
             </div>
           </div>

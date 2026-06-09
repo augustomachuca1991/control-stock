@@ -57,6 +57,12 @@ const hoverStyles: Record<ButtonVariant, React.CSSProperties> = {
   "surface":      { background: "rgba(255,255,255,0.11)" },
 };
 
+const disabledStyle: React.CSSProperties = {
+  opacity: 0.35,
+  cursor: "not-allowed",
+  pointerEvents: "none",
+};
+
 export const Button: React.FC<ButtonProps> = ({
   variant = "gold",
   size = "md",
@@ -71,14 +77,14 @@ export const Button: React.FC<ButtonProps> = ({
   const combined: React.CSSProperties = {
     ...styles[variant],
     ...sizes[size],
-    ...(hovered ? hoverStyles[variant] : {}),
+    ...(props.disabled ? disabledStyle : hovered ? hoverStyles[variant] : {}),
     ...style,
   };
 
   return (
     <button
       style={combined}
-      onMouseEnter={(e) => { setHovered(true); onMouseEnter?.(e); }}
+      onMouseEnter={(e) => { if (!props.disabled) { setHovered(true); onMouseEnter?.(e); } }}
       onMouseLeave={(e) => { setHovered(false); onMouseLeave?.(e); }}
       {...props}
     >

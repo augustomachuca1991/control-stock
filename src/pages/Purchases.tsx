@@ -46,6 +46,7 @@ export function Purchases() {
   const [newBrand, setNewBrand] = useState('')
   const [newCategoryId, setNewCategoryId] = useState('')
   const [newDescription, setNewDescription] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const products = useProductStore((s) => s.products)
   const categories = useCategoryStore((s) => s.categories)
@@ -136,6 +137,7 @@ export function Purchases() {
   }, [])
 
   const handleSave = useCallback(async () => {
+    setSaving(true)
     const purchaseItems: PurchaseItemType[] = []
 
     for (const entry of entries) {
@@ -171,6 +173,7 @@ export function Purchases() {
       await addPurchase({ items: purchaseItems, total, date: invoiceDate })
     }
 
+    setSaving(false)
     setEntries([])
     resetCurrent()
     setInvoiceDate(new Date().toISOString().split('T')[0])
@@ -513,8 +516,8 @@ export function Purchases() {
 
           <div className="flex justify-end gap-3 border-t border-border pt-4">
             <Button variant="gold-outline" onClick={() => setPreviewOpen(false)}>Volver</Button>
-            <Button variant="gold" onClick={() => { handleSave(); setPreviewOpen(false) }}>
-              Confirmar y Guardar
+            <Button variant="gold" onClick={() => { handleSave(); setPreviewOpen(false) }} disabled={saving}>
+              {saving ? 'Guardando...' : 'Confirmar y Guardar'}
             </Button>
           </div>
         </div>

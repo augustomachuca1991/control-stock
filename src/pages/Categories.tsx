@@ -19,6 +19,7 @@ export function Categories() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<CategoryForm>(emptyForm)
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const categories = useCategoryStore((s) => s.categories)
   const { add: addCategory, update: updateCategory, delete: deleteCategory } = useCategories()
@@ -39,11 +40,13 @@ export function Categories() {
 
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) return
+    setSaving(true)
     if (editingId) {
       await updateCategory(editingId, form)
     } else {
       await addCategory(form)
     }
+    setSaving(false)
     setModalOpen(false)
   }, [form, editingId, addCategory, updateCategory])
 
@@ -104,8 +107,8 @@ export function Categories() {
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="gold-outline" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
-          <Button variant="surface" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }} onClick={async () => { if (deleteConfirm) { await deleteCategory(deleteConfirm.id); setDeleteConfirm(null) } }}>
-            Eliminar
+          <Button variant="surface" disabled={saving} style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }} onClick={async () => { if (deleteConfirm) { setSaving(true); await deleteCategory(deleteConfirm.id); setSaving(false); setDeleteConfirm(null) } }}>
+            {saving ? 'Eliminando...' : 'Eliminar'}
           </Button>
         </div>
       </Modal>
@@ -133,8 +136,8 @@ export function Categories() {
           <Button variant="gold-outline" size="md" onClick={() => setModalOpen(false)}>
             Cancelar
           </Button>
-          <Button variant="gold" size="md" onClick={handleSave} disabled={!form.name.trim()}>
-            {editingId ? 'Guardar' : 'Crear'}
+          <Button variant="gold" size="md" onClick={handleSave} disabled={!form.name.trim() || saving}>
+            {saving ? 'Guardando...' : (editingId ? 'Guardar' : 'Crear')}
           </Button>
         </div>
       </Modal>

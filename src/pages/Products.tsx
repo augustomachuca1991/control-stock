@@ -62,6 +62,8 @@ export function Products() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<ProductForm>(emptyForm)
   const [deleteConfirm, setDeleteConfirm] = useState<Product | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const barcodeRef = useRef<HTMLInputElement>(null)
 
   useCategories()
@@ -112,6 +114,7 @@ export function Products() {
   }, [])
 
   const handleSave = useCallback(async () => {
+    setSaving(true)
     const numeric = (v: string) => parseFloat(v) || 0
     const int = (v: string) => parseInt(v, 10) || 0
     const base = {
@@ -123,12 +126,15 @@ export function Products() {
     }
     if (editingId) await updateProduct(editingId, base)
     else await addProduct(base)
+    setSaving(false)
     setFormModalOpen(false)
   }, [form, editingId, addProduct, updateProduct])
 
   const confirmDelete = useCallback(async () => {
     if (!deleteConfirm) return
+    setDeleting(true)
     await deleteProduct(deleteConfirm.id)
+    setDeleting(false)
     setDeleteConfirm(null)
   }, [deleteConfirm, deleteProduct])
 
@@ -363,8 +369,8 @@ export function Products() {
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="gold-outline" onClick={() => setFormModalOpen(false)}>Cancelar</Button>
-          <Button variant="gold" onClick={handleSave}>
-            {editingId ? 'Guardar Cambios' : 'Crear Producto'}
+          <Button variant="gold" onClick={handleSave} disabled={saving}>
+            {saving ? 'Guardando...' : (editingId ? 'Guardar Cambios' : 'Crear Producto')}
           </Button>
         </div>
       </Modal>
@@ -382,7 +388,7 @@ export function Products() {
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="gold-outline" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
-          <Button variant="surface" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }} onClick={confirmDelete}>Eliminar</Button>
+          <Button variant="surface" disabled={deleting} style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }} onClick={confirmDelete}>{deleting ? 'Eliminando...' : 'Eliminar'}</Button>
         </div>
       </Modal>
 
