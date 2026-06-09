@@ -29,7 +29,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     <>
       {/* Overlay mobile */}
       <div
-        className={`fixed inset-0 z-30 bg-black/60 backdrop-blur-sm transition-opacity duration-300 md:hidden ${
+        className={`fixed inset-0 z-30 bg-black/60 backdrop-blur-sm transition-opacity duration-700 ease-out will-change-opacity md:hidden ${
           open ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
@@ -37,8 +37,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-border bg-surface transition-transform duration-300 ease-in-out md:static md:z-auto md:translate-x-0 ${
-          open ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-border bg-surface transition-all duration-700 ease-out will-change-transform md:static md:z-auto md:translate-x-0 md:opacity-100 ${
+          open ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
         }`}
       >
         {/* Logo */}

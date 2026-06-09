@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useProfile } from '../../hooks/useProfile'
 import { useThemeStore } from '../../stores/useThemeStore'
 import { Modal } from '../ui/Modal'
+import { Img } from '../ui/Img'
 import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
 import { Field } from '../ui/Field'
@@ -99,7 +100,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-primary-dim"
           >
             {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+              <Img src={profile.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover" skeleton="rounded-full" />
             ) : (
               <span
                 className="flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-bold"
@@ -162,7 +163,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                 <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted">Foto de perfil</p>
                 <div className="flex items-center gap-3">
                   {profile?.avatar_url ? (
-                    <img src={profile.avatar_url} alt="" className="h-12 w-12 rounded-full object-cover" />
+                    <Img src={profile.avatar_url} alt="" className="h-12 w-12 rounded-full object-cover" skeleton="rounded-full" />
                   ) : (
                     <span
                       className="flex h-12 w-12 items-center justify-center rounded-full text-[16px] font-bold"

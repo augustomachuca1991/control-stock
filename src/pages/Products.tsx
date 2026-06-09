@@ -7,6 +7,7 @@ import { Input } from '../components/ui/Input'
 import { Modal } from '../components/ui/Modal'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
+import { Img } from '../components/ui/Img'
 import { Field } from '../components/ui/Field'
 import { SelectField } from '../components/ui/SelectField'
 import { useProductStore } from '../stores/useProductStore'
@@ -39,7 +40,7 @@ function ProductThumb({ src, className }: { src?: string; className?: string }) 
     )
   }
   return (
-    <img src={src} alt="" className={`rounded-lg object-cover ${className ?? 'h-10 w-10'}`} onError={() => setErrored(true)} />
+    <Img src={src} alt="" className={`rounded-lg object-cover ${className ?? 'h-10 w-10'}`} skeleton="rounded-lg" onError={() => setErrored(true)} />
   )
 }
 
@@ -344,7 +345,7 @@ export function Products() {
               <div className="flex flex-wrap gap-3">
                 {selectedProduct.images.map((img, i) => (
                   <button key={i} type="button" onClick={() => setPreviewImage(img)} className="cursor-pointer">
-                    <img src={img} alt="" className="h-32 w-32 rounded-lg border border-border object-cover transition-opacity hover:opacity-80" />
+                    <Img src={img} alt="" className="h-32 w-32 rounded-lg border border-border object-cover" skeleton="rounded-lg" />
                   </button>
                 ))}
               </div>
@@ -400,10 +401,11 @@ export function Products() {
           >
             <X size={20} />
           </button>
-          <img
+          <Img
             src={previewImage}
             alt=""
             className="relative max-h-[90vh] max-w-full rounded-lg object-contain"
+            skeleton="rounded-lg"
             onClick={(e) => e.stopPropagation()}
           />
         </div>

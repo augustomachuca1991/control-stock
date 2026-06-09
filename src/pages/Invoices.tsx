@@ -3,6 +3,7 @@ import { Upload, FileText, Loader2, CheckCircle2, AlertCircle, X, Package } from
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
+import { Img } from '../components/ui/Img'
 import { Modal } from '../components/ui/Modal'
 import { config } from '../config'
 import { toast } from 'sonner'
@@ -296,7 +297,7 @@ export function Invoices() {
               <div className="space-y-4">
                 <div className="flex items-start gap-4 rounded-lg border border-border bg-surface p-4">
                   {preview ? (
-                    <img src={preview} alt="Preview" className="h-28 w-28 rounded-lg object-cover" />
+                    <Img src={preview} alt="Preview" className="h-28 w-28 rounded-lg object-cover" skeleton="rounded-lg" />
                   ) : (
                     <div className="flex h-28 w-28 items-center justify-center rounded-lg bg-primary-dim">
                       <FileText size={32} className="text-primary-light" />
@@ -513,10 +514,11 @@ export function Invoices() {
                 {inv.imageUrl && (
                   <div className="mb-3">
                     <button type="button" onClick={() => setPreviewImage(inv.imageUrl!)} className="cursor-pointer">
-                      <img
+                      <Img
                         src={inv.imageUrl}
                         alt=""
-                        className="h-24 w-full rounded-lg border border-border object-cover transition-opacity hover:opacity-80"
+                        className="h-24 w-full rounded-lg border border-border object-cover"
+                        skeleton="rounded-lg"
                       />
                     </button>
                   </div>
@@ -558,10 +560,11 @@ export function Invoices() {
           >
             <X size={20} />
           </button>
-          <img
-            src={previewImage}
+          <Img
+            src={previewImage!}
             alt=""
             className="relative max-h-[90vh] max-w-full rounded-lg object-contain"
+            skeleton="rounded-lg"
             onClick={(e) => e.stopPropagation()}
           />
         </div>
