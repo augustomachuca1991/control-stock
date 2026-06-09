@@ -54,8 +54,11 @@ export interface InvoiceItem {
 export interface Invoice {
   id: string
   fileName: string
+  fileHash: string
   date: string
   total: number
+  iva: number
+  iibb: number
   items: InvoiceItem[]
   imageUrl?: string
   status: 'processed' | 'failed'
@@ -82,6 +85,8 @@ export interface Purchase {
   id: string
   items: PurchaseItem[]
   total: number
+  iva: number
+  iibb: number
   date: string
   userId?: string
   userEmail?: string

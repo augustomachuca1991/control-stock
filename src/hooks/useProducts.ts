@@ -41,7 +41,7 @@ export function useProducts() {
         name: input.name,
         brand: input.brand,
         barcode: input.barcode,
-        category_id: input.categoryId,
+        category_id: input.categoryId || null,
         price: input.price,
         cost: input.cost,
         stock: input.stock,

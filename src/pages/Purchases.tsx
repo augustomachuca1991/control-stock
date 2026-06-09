@@ -386,6 +386,8 @@ export function Purchases() {
                     </div>
                     <div className="text-right">
                       <p className="text-[15px] font-bold text-accent">{config.currency.symbol}{pch.total.toFixed(2)}</p>
+                      {pch.iva > 0 && <p className="text-[10px] text-muted">IVA {config.currency.symbol}{pch.iva.toFixed(2)}</p>}
+                      {pch.iibb > 0 && <p className="text-[10px] text-muted">IIBB {config.currency.symbol}{pch.iibb.toFixed(2)}</p>}
                       <p className="text-[11px] text-muted">{pch.items.length} artículo(s)</p>
                     </div>
                   </div>

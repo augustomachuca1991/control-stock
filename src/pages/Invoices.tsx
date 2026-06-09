@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Upload, FileText, Loader2, CheckCircle2, AlertCircle, X, Package } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -11,10 +11,13 @@ import { useProducts } from '../hooks/useProducts'
 import { usePurchases } from '../hooks/usePurchases'
 import { useInvoices } from '../hooks/useInvoices'
 import { useCategoryStore } from '../stores/useCategoryStore'
+import { supabase } from '../lib/supabaseClient'
+import { computeFileHash } from '../lib/hash'
 import type { PurchaseItem, InvoiceItem } from '../types'
 
 interface DetectedItem {
   productName: string
+  brand: string
   barcode: string
   quantity: number
   unitCost: number
@@ -24,6 +27,8 @@ interface DetectedItem {
 interface AnalysisResult {
   date: string
   total: number
+  iva: number
+  iibb: number
   items: DetectedItem[]
 }
 
@@ -32,17 +37,27 @@ export function Invoices() {
   const [preview, setPreview] = useState<string | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [result, setResult] = useState<AnalysisResult | null>(null)
+  const [editItems, setEditItems] = useState<DetectedItem[]>([])
+  const [editDate, setEditDate] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [defaultCategoryId, setDefaultCategoryId] = useState('')
   const [categoryError, setCategoryError] = useState('')
+  const [fileHash, setFileHash] = useState('')
   const { products, add: addProduct, update: updateProduct, increaseStock } = useProducts()
   const { add: addPurchase } = usePurchases()
   const { invoices, add: addInvoice } = useInvoices()
   const categories = useCategoryStore((s) => s.categories)
   const inputRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (result) {
+      setEditItems(result.items.map(i => ({ ...i })))
+      setEditDate(result.date || new Date().toISOString().split('T')[0])
+    }
+  }, [result])
 
   const handleFile = useCallback((f: File) => {
     if (!f.type.startsWith('image/') && f.type !== 'application/pdf') return
@@ -71,27 +86,53 @@ export function Invoices() {
     if (!file) return
     setAnalyzing(true)
     setResult(null)
-
-    const formData = new FormData()
-    formData.append('file', file)
+    setFileHash('')
 
     try {
+      const hash = await computeFileHash(file)
+
+      const { data: existing } = await supabase
+        .from('invoices')
+        .select('file_name, created_at')
+        .eq('file_hash', hash)
+        .maybeSingle()
+      if (existing) {
+        const fecha = new Date(existing.created_at).toLocaleDateString('es-ES')
+        toast.error(`Esta factura ya fue procesada como "${existing.file_name}" el ${fecha}`)
+        setAnalyzing(false)
+        return
+      }
+
+      setFileHash(hash)
+
+      const formData = new FormData()
+      formData.append('file', file)
+
       if (config.invoiceWebhookUrl) {
-        const formData = new FormData()
-        formData.append('file', file)
         const res = await fetch(config.invoiceWebhookUrl, { method: 'POST', body: formData })
+        if (!res.ok) throw new Error('Error en el análisis')
         const data: AnalysisResult = await res.json()
         setResult(data)
+      } else if (config.invoiceAiUrl) {
+        const res = await fetch(config.invoiceAiUrl, { method: 'POST', body: formData })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || 'Error al analizar la factura')
+        }
+        const data: AnalysisResult = await res.json()
+        if (!data.date) data.date = new Date().toISOString().split('T')[0]
+        setResult(data)
       } else {
-        // Mock mientras no hay webhook configurado
         await new Promise((r) => setTimeout(r, 1500))
         setResult({
           date: new Date().toISOString().split('T')[0],
           total: 12580.50,
+          iva: 2310.00,
+          iibb: 500.00,
           items: [
-            { productName: 'Lapicera Bic Azul', barcode: '7791234567890', quantity: 50, unitCost: 120.50, isNew: false },
-            { productName: 'Cuaderno Rivadavia A4', barcode: '7790987654321', quantity: 30, unitCost: 210.00, isNew: false },
-            { productName: 'Resaltador Stabilo', barcode: '7791122334455', quantity: 20, unitCost: 95.00, isNew: true },
+            { productName: 'Lapicera Bic Azul', brand: 'Bic', barcode: '7791234567890', quantity: 50, unitCost: 120.50, isNew: false },
+            { productName: 'Cuaderno Rivadavia A4', brand: 'Rivadavia', barcode: '7790987654321', quantity: 30, unitCost: 210.00, isNew: false },
+            { productName: 'Resaltador Stabilo', brand: 'Stabilo', barcode: '7791122334455', quantity: 20, unitCost: 95.00, isNew: true },
           ],
         })
       }
@@ -117,7 +158,7 @@ export function Invoices() {
     const productIds = new Map<string, string>()
 
     try {
-      for (const item of result.items) {
+      for (const item of editItems) {
         const existing = products.find((p) => p.barcode === item.barcode)
 
         if (existing) {
@@ -131,14 +172,14 @@ export function Invoices() {
         } else {
           const { data, error } = await addProduct({
             name: item.productName,
-            brand: '',
+            brand: item.brand || 'N/A',
             barcode: item.barcode,
-            categoryId: defaultCategoryId || null,
+            categoryId: defaultCategoryId,
             price: 0,
             cost: item.unitCost,
             stock: item.quantity,
             minStock: 0,
-            description: '',
+            description: item.productName,
             images: [],
             enabled: false,
           })
@@ -150,7 +191,7 @@ export function Invoices() {
         }
       }
 
-      const purchaseItems: PurchaseItem[] = result.items.map((item) => ({
+      const purchaseItems: PurchaseItem[] = editItems.map((item) => ({
         productId: productIds.get(item.barcode) ?? '',
         productName: item.productName,
         barcode: item.barcode,
@@ -161,15 +202,20 @@ export function Invoices() {
       const { error: purchaseErr } = await addPurchase({
         items: purchaseItems,
         total: result.total,
-        date: result.date,
+        iva: result.iva,
+        iibb: result.iibb,
+        date: editDate,
       })
       if (purchaseErr) throw new Error(`Error al registrar la compra: ${purchaseErr}`)
 
       const { error: invoiceErr } = await addInvoice({
         fileName: file?.name ?? 'factura',
-        date: result.date,
+        fileHash,
+        date: editDate,
         total: result.total,
-        items: result.items as InvoiceItem[],
+        iva: result.iva,
+        iibb: result.iibb,
+        items: editItems as InvoiceItem[],
         status: 'processed',
       })
       if (invoiceErr) throw new Error(`Error al guardar el historial: ${invoiceErr}`)
@@ -182,7 +228,7 @@ export function Invoices() {
     } finally {
       setSaving(false)
     }
-  }, [result, products, defaultCategoryId, addProduct, increaseStock, updateProduct, addPurchase])
+  }, [result, editItems, editDate, products, defaultCategoryId, addProduct, increaseStock, updateProduct, addPurchase])
 
   const reset = useCallback(() => {
     setFile(null)
@@ -190,6 +236,7 @@ export function Invoices() {
     setResult(null)
     setSaved(false)
     setCategoryError('')
+    setFileHash('')
     if (file?.type.startsWith('image/') && preview) URL.revokeObjectURL(preview)
   }, [file, preview])
 
@@ -274,7 +321,7 @@ export function Invoices() {
             <div className="grid grid-cols-2 gap-4 text-[12px]">
               <div>
                 <span className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Fecha</span>
-                <p className="mt-0.5 text-text">{new Date(result.date).toLocaleDateString('es-ES', { dateStyle: 'long' })}</p>
+                <p className="mt-0.5 text-text">{editDate ? new Date(editDate).toLocaleDateString('es-ES', { dateStyle: 'long' }) : '—'}</p>
               </div>
               <div className="text-right">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Total</span>
@@ -294,7 +341,7 @@ export function Invoices() {
                         <p className="text-[13px] font-medium text-text truncate">{item.productName}</p>
                         {item.isNew && <Badge variant="warning">Nuevo</Badge>}
                       </div>
-                      <code className="text-[10px] text-muted">{item.barcode}</code>
+                      <p className="text-[10px] text-muted">{item.brand || 'N/A'} · {item.barcode}</p>
                     </div>
                     <div className="text-right shrink-0 ml-3">
                       <p className="text-[12px] text-text">{config.currency.symbol}{item.unitCost.toFixed(2)} x {item.quantity}</p>
@@ -339,7 +386,7 @@ export function Invoices() {
               <AlertCircle size={16} className="mt-0.5 shrink-0 text-primary-light" />
               <div className="text-[12px] text-muted">
                 <p className="font-semibold text-text">¿Guardar esta factura?</p>
-                <p className="mt-1">Se crearán los productos nuevos, se actualizará el stock de los existentes y se registrará la compra en el historial.</p>
+                <p className="mt-1">Podés corregir la fecha y el tipo de cada producto antes de confirmar.</p>
               </div>
             </div>
 
@@ -356,20 +403,69 @@ export function Invoices() {
               </div>
             )}
 
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Fecha de la factura</label>
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2 text-[13px] text-text outline-none focus:border-primary-light"
+                />
+              </div>
+              <div className="text-right self-end">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Total</span>
+                <p className="text-[22px] font-bold text-accent">{config.currency.symbol}{result.total.toFixed(2)}</p>
+              </div>
+            </div>
+
             <div className="rounded-lg border border-border divide-y divide-border/50">
-              {result.items.map((item, i) => (
-                <div key={i} className="flex items-center justify-between px-4 py-2 text-[12px]">
-                  <span className="text-text">{item.productName}</span>
-                  <span className="text-muted-light">
-                    {item.isNew ? '🆕 Nuevo' : '📦 Reposición'} — {config.currency.symbol}{item.unitCost.toFixed(2)} x {item.quantity}
-                  </span>
+              {editItems.map((item, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 px-4 py-2.5 text-[12px]">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-text truncate">{item.productName}</p>
+                    <p className="text-[10px] text-muted">{item.brand || 'N/A'} · {item.barcode}</p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-muted-light whitespace-nowrap">{config.currency.symbol}{item.unitCost.toFixed(2)} x {item.quantity}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[10px] font-medium ${item.isNew ? 'text-warning-text' : 'text-muted'}`}>
+                        {item.isNew ? 'Nuevo' : 'Reposición'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, isNew: !it.isNew } : it))}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border transition-colors ${
+                          item.isNew
+                            ? 'border-warning-text/40 bg-warning-dim/40'
+                            : 'border-border bg-surface-dim'
+                        }`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 rounded-full bg-text transition-transform ${item.isNew ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
 
-            <div className="flex justify-between border-t border-border pt-3">
-              <span className="text-[13px] font-semibold text-text">Total factura</span>
-              <span className="text-[18px] font-bold text-accent">{config.currency.symbol}{result.total.toFixed(2)}</span>
+            <div className="space-y-1 border-t border-border pt-3">
+              {result.iva > 0 && (
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-muted">IVA</span>
+                  <span className="text-muted-light">{config.currency.symbol}{result.iva.toFixed(2)}</span>
+                </div>
+              )}
+              {result.iibb > 0 && (
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-muted">IIBB</span>
+                  <span className="text-muted-light">{config.currency.symbol}{result.iibb.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-[13px] font-semibold text-text">Total factura</span>
+                <span className="text-[18px] font-bold text-accent">{config.currency.symbol}{result.total.toFixed(2)}</span>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3">
@@ -402,6 +498,8 @@ export function Invoices() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-[15px] font-bold text-accent">{config.currency.symbol}{inv.total.toFixed(2)}</p>
+                    {inv.iva > 0 && <p className="text-[10px] text-muted">IVA {config.currency.symbol}{inv.iva.toFixed(2)}</p>}
+                    {inv.iibb > 0 && <p className="text-[10px] text-muted">IIBB {config.currency.symbol}{inv.iibb.toFixed(2)}</p>}
                     <Badge variant="success">Procesada</Badge>
                   </div>
                 </div>

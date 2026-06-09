@@ -146,6 +146,7 @@ create policy "auth_product_images_delete"
 create table invoices (
   id         uuid primary key default gen_random_uuid(),
   file_name  text not null default '',
+  file_hash  text not null default '',
   date       text not null default '',
   total      numeric not null default 0,
   items      jsonb not null default '[]'::jsonb,
@@ -163,3 +164,9 @@ create policy "auth_invoices_update" on invoices for update using (auth.role() =
 create policy "auth_invoices_delete" on invoices for delete using (auth.role() = 'authenticated');
 
 create index idx_invoices_created_at on invoices(created_at desc);
+create index idx_invoices_file_hash on invoices(file_hash);
+
+alter table purchases add column iva numeric not null default 0;
+alter table purchases add column iibb numeric not null default 0;
+alter table invoices add column iva numeric not null default 0;
+alter table invoices add column iibb numeric not null default 0;

@@ -8,6 +8,8 @@ type PurchaseRow = {
   id: string
   items: unknown
   total: number
+  iva: number
+  iibb: number
   date: string
   user_id: string | null
   user_email: string | null
@@ -32,6 +34,8 @@ export function usePurchases() {
         id: p.id,
         items: p.items as PurchaseItem[],
         total: Number(p.total),
+        iva: Number(p.iva),
+        iibb: Number(p.iibb),
         date: p.date,
         userId: p.user_id ?? undefined,
         userEmail: p.user_email ?? undefined,
@@ -44,7 +48,7 @@ export function usePurchases() {
 
   useEffect(() => { load() }, [load])
 
-  const add = useCallback(async (input: { items: PurchaseItem[]; total: number; date: string }) => {
+  const add = useCallback(async (input: { items: PurchaseItem[]; total: number; iva?: number; iibb?: number; date: string }) => {
     const { data: user } = await supabase.auth.getUser()
     const userEmail = user?.user?.email ?? ''
 
@@ -53,6 +57,8 @@ export function usePurchases() {
       .insert({
         items: input.items as unknown as Record<string, unknown>,
         total: input.total,
+        iva: input.iva ?? 0,
+        iibb: input.iibb ?? 0,
         date: input.date,
         user_email: userEmail,
       })
@@ -70,6 +76,8 @@ export function usePurchases() {
             id: row.id,
             items: row.items as PurchaseItem[],
             total: Number(row.total),
+            iva: Number(row.iva),
+            iibb: Number(row.iibb),
             date: row.date,
             userId: row.user_id ?? undefined,
             userEmail: row.user_email ?? undefined,

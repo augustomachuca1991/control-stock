@@ -3,7 +3,7 @@ import type { Purchase, PurchaseItem } from '../types'
 
 interface PurchaseState {
   purchases: Purchase[]
-  addPurchase: (data: { items: PurchaseItem[]; total: number; date: string }) => void
+  addPurchase: (data: { items: PurchaseItem[]; total: number; iva?: number; iibb?: number; date: string }) => void
 }
 
 export const usePurchaseStore = create<PurchaseState>((set) => ({
@@ -13,6 +13,8 @@ export const usePurchaseStore = create<PurchaseState>((set) => ({
       id: `pch-${Date.now()}`,
       items: data.items,
       total: data.total,
+      iva: data.iva ?? 0,
+      iibb: data.iibb ?? 0,
       date: data.date,
       createdAt: Date.now(),
     }

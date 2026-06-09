@@ -7,8 +7,11 @@ import type { Invoice, InvoiceItem } from '../types'
 type InvoiceRow = {
   id: string
   file_name: string
+  file_hash: string
   date: string
   total: number
+  iva: number
+  iibb: number
   items: unknown
   image_url: string | null
   status: string
@@ -19,8 +22,11 @@ type InvoiceRow = {
 const mapRow = (row: InvoiceRow): Invoice => ({
   id: row.id,
   fileName: row.file_name,
+  fileHash: row.file_hash,
   date: row.date,
   total: Number(row.total),
+  iva: Number(row.iva),
+  iibb: Number(row.iibb),
   items: row.items as InvoiceItem[],
   imageUrl: row.image_url ?? undefined,
   status: row.status as 'processed' | 'failed',
@@ -52,8 +58,11 @@ export function useInvoices() {
 
   const add = useCallback(async (input: {
     fileName: string
+    fileHash?: string
     date: string
     total: number
+    iva?: number
+    iibb?: number
     items: InvoiceItem[]
     imageUrl?: string
     status?: 'processed' | 'failed'
@@ -62,8 +71,11 @@ export function useInvoices() {
       .from('invoices')
       .insert({
         file_name: input.fileName,
+        file_hash: input.fileHash ?? '',
         date: input.date,
         total: input.total,
+        iva: input.iva ?? 0,
+        iibb: input.iibb ?? 0,
         items: input.items as unknown as Record<string, unknown>,
         image_url: input.imageUrl ?? '',
         status: input.status ?? 'processed',
