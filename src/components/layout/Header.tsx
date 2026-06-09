@@ -1,15 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Formik, Form } from 'formik'
-import { Menu, LogOut, Settings } from 'lucide-react'
+import { Menu, LogOut, Settings, Sun, Moon, Upload } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProfile } from '../../hooks/useProfile'
+import { useThemeStore } from '../../stores/useThemeStore'
 import { Modal } from '../ui/Modal'
 import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
 import { Field } from '../ui/Field'
 import { profileSchema } from '../../lib/validation'
 import MarelyLogo from '../ui/MarelyLogo'
+import { toast } from 'sonner'
 
 const titles: Record<string, string> = {
   '/': 'Dashboard',
@@ -27,9 +29,10 @@ interface HeaderProps {
 export function Header({ onToggleSidebar }: HeaderProps) {
   const { pathname } = useLocation()
   const { user, signOut } = useAuth()
-  const { profile, update: updateProfile } = useProfile(user?.id)
+  const { profile, update: updateProfile, uploadAvatar, uploading } = useProfile(user?.id)
   const navigate = useNavigate()
   const title = titles[pathname] ?? 'Control de Stock'
+  const { theme, toggle: toggleTheme } = useThemeStore()
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
@@ -81,14 +84,33 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </div>
         </div>
 
-        <div className="relative" ref={dropdownRef}>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleTheme}
+            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-primary-dim hover:text-primary-light"
+            aria-label="Cambiar tema"
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+
+          <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setDropdownOpen((v) => !v)}
             className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-primary-dim"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[12px] font-bold text-white">
-              {initial}
-            </span>
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+            ) : (
+              <span
+                className="flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-bold"
+                style={{
+                  background: theme === 'light' ? '#1c1917' : '#C9A84C',
+                  color: theme === 'light' ? '#faf6f0' : '#0D0D0A',
+                }}
+              >
+                {initial}
+              </span>
+            )}
             <span className="hidden text-[12px] font-medium uppercase text-text sm:block">
               {profile?.full_name || user?.email}
             </span>
@@ -117,6 +139,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               </button>
             </div>
           )}
+          </div>
         </div>
       </header>
 
@@ -135,6 +158,40 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             <Form className="space-y-4">
               <Field name="full_name" label="Nombre completo" placeholder="Tu nombre" />
               <Field name="phone" label="Teléfono" placeholder="+54 11 1234-5678" />
+              <div>
+                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted">Foto de perfil</p>
+                <div className="flex items-center gap-3">
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt="" className="h-12 w-12 rounded-full object-cover" />
+                  ) : (
+                    <span
+                      className="flex h-12 w-12 items-center justify-center rounded-full text-[16px] font-bold"
+                      style={{
+                        background: theme === 'light' ? '#1c1917' : '#C9A84C',
+                        color: theme === 'light' ? '#faf6f0' : '#0D0D0A',
+                      }}
+                    >
+                      {initial}
+                    </span>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    id="avatar-upload"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const { error } = await uploadAvatar(file)
+                      if (error) toast.error(error)
+                      e.target.value = ''
+                    }}
+                  />
+                  <Button variant="surface" size="sm" type="button" disabled={uploading} onClick={() => document.getElementById('avatar-upload')?.click()}>
+                    <Upload size={13} /> {uploading ? 'Subiendo...' : 'Subir foto'}
+                  </Button>
+                </div>
+              </div>
               <Input label="Email" value={user?.email ?? ''} disabled />
               <div className="mt-6 flex justify-end gap-3">
                 <Button variant="gold-outline" type="button" onClick={() => { resetForm(); setProfileModalOpen(false) }}>Cancelar</Button>

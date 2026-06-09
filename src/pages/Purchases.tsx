@@ -378,7 +378,7 @@ export function Purchases() {
                       <p className="text-[13px] font-semibold text-text">Compra #{pch.id.slice(-6).toUpperCase()}</p>
                       <p className="text-[11px] text-muted">
                         {new Date(pch.createdAt).toLocaleDateString('es-ES', { dateStyle: 'long' })}
-                        {pch.date && ` · Comp. ${new Date(pch.date).toLocaleDateString('es-ES')}`}
+                        {pch.date && ` · Comp. ${new Date(+pch.date.slice(0,4), +pch.date.slice(5,7)-1, +pch.date.slice(8,10)).toLocaleDateString('es-ES')}`}
                       </p>
                       {pch.userEmail && (
                         <p className="text-[10px] text-muted mt-0.5">Registró: {pch.userEmail}</p>
@@ -429,7 +429,7 @@ export function Purchases() {
             <div className="text-right text-[12px] text-muted-light">
               <p>
                 <span className="text-muted">Fecha: </span>
-                {new Date(invoiceDate).toLocaleDateString('es-ES', { dateStyle: 'long' })}
+                {new Date(+invoiceDate.slice(0,4), +invoiceDate.slice(5,7)-1, +invoiceDate.slice(8,10)).toLocaleDateString('es-ES', { dateStyle: 'long' })}
               </p>
               <p className="text-[11px] text-muted">Comprobante #{Date.now().toString().slice(-6)}</p>
             </div>

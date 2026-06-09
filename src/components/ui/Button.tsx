@@ -35,9 +35,9 @@ const styles: Record<ButtonVariant, React.CSSProperties> = {
     transition: "background 0.15s",
   },
   "surface": {
-    background: "rgba(255,255,255,0.07)",
-    color: "#F0E8D0",
-    border: "1px solid rgba(255,255,255,0.12)",
+    background: "var(--clr-primary-dim)",
+    color: "var(--clr-primary-text)",
+    border: "1px solid var(--clr-border-strong)",
     fontWeight: 500,
     cursor: "pointer",
     display: "inline-flex",
@@ -56,8 +56,8 @@ const sizes: Record<ButtonSize, React.CSSProperties> = {
 
 const hoverStyles: Record<ButtonVariant, React.CSSProperties> = {
   "gold":         { background: "#D4A017" },
-  "gold-outline": { background: "rgba(201,168,76,0.12)" },
-  "surface":      { background: "rgba(255,255,255,0.11)" },
+  "gold-outline": { background: "rgba(201,168,76,0.15)" },
+  "surface":      { border: "1px solid var(--clr-primary)" },
 };
 
 const disabledStyle: React.CSSProperties = {

@@ -26,6 +26,8 @@ export function useProducts() {
         minStock: p.min_stock,
         enabled: p.enabled ?? true,
         userId: p.user_id ?? undefined,
+        createdAt: new Date(p.created_at).getTime(),
+        updatedAt: new Date(p.updated_at).getTime(),
       })) as unknown as Product[]
       useProductStore.setState({ products: mapped })
     }
@@ -57,8 +59,17 @@ export function useProducts() {
       return { error: err.message }
     }
     if (data) {
+      const product = {
+        ...data,
+        categoryId: data.category_id,
+        minStock: data.min_stock,
+        enabled: data.enabled ?? true,
+        userId: data.user_id ?? undefined,
+        createdAt: new Date(data.created_at).getTime(),
+        updatedAt: new Date(data.updated_at).getTime(),
+      } as unknown as Product
       useProductStore.setState((state) => ({
-        products: [...state.products, data as unknown as Product],
+        products: [...state.products, product],
       }))
     }
     return { data }

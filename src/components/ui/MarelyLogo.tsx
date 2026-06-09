@@ -1,4 +1,5 @@
 import React from "react";
+import { useThemeStore } from "../../stores/useThemeStore";
 
 interface MarelyLogoProps {
   backgroundColor?: string;
@@ -12,17 +13,26 @@ interface MarelyLogoProps {
   iconOnly?: boolean;
 }
 
+const LIGHT_E = "#57534e";
+const DARK_E = "#F0E8D0";
+
 const MarelyLogo: React.FC<MarelyLogoProps> = ({
   backgroundColor = "transparent",
   letterMColor = "#C9A84C",
-  letterEColor = "#F0E8D0",
-  textColor = "#F0E8D0",
+  letterEColor,
+  textColor,
   subtitleColor = "#888888",
-  dividerColor = "#444444",
+  dividerColor,
   width = "100%",
   className,
   iconOnly,
 }) => {
+  const theme = useThemeStore((s) => s.theme);
+
+  const eColor = letterEColor ?? (theme === "light" ? LIGHT_E : DARK_E);
+  const txtColor = textColor ?? (theme === "light" ? LIGHT_E : DARK_E);
+  const divColor = dividerColor ?? (theme === "light" ? "#d4d4d8" : "#444444");
+
   if (iconOnly) {
     return (
       <svg
@@ -49,7 +59,7 @@ const MarelyLogo: React.FC<MarelyLogoProps> = ({
           fontFamily="'Playfair Display', 'Times New Roman', serif"
           fontSize="40"
           fontWeight="900"
-          fill={letterEColor}
+          fill={eColor}
         >E</text>
       </svg>
     )
@@ -84,17 +94,17 @@ const MarelyLogo: React.FC<MarelyLogoProps> = ({
         fontFamily="'Playfair Display', 'Times New Roman', serif"
         fontSize="40"
         fontWeight="900"
-        fill={letterEColor}
+        fill={eColor}
       >E</text>
 
-      <line x1="68" y1="6" x2="68" y2="44" stroke={dividerColor} strokeWidth="0.8" />
+      <line x1="68" y1="6" x2="68" y2="44" stroke={divColor} strokeWidth="0.8" />
 
       <text
         x="78" y="26"
         fontFamily="'Playfair Display', 'Times New Roman', serif"
         fontSize="15"
         fontWeight="700"
-        fill={textColor}
+        fill={txtColor}
         letterSpacing="3"
       >MARELY</text>
 

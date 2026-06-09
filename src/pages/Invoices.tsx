@@ -326,7 +326,7 @@ export function Invoices() {
             <div className="grid grid-cols-2 gap-4 text-[12px]">
               <div>
                 <span className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Fecha</span>
-                <p className="mt-0.5 text-text">{editDate ? new Date(editDate).toLocaleDateString('es-ES', { dateStyle: 'long' }) : '—'}</p>
+                <p className="mt-0.5 text-text">{editDate ? new Date(+editDate.slice(0,4), +editDate.slice(5,7)-1, +editDate.slice(8,10)).toLocaleDateString('es-ES', { dateStyle: 'long' }) : '—'}</p>
               </div>
               <div className="text-right">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Total</span>
