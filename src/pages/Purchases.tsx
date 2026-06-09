@@ -1,17 +1,20 @@
 import { useState, useMemo, useCallback } from 'react'
+import { Formik, Form } from 'formik'
 import { Trash2, Package, FileText, CheckCircle2, History, ShoppingCart } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
-import { Select } from '../components/ui/Select'
 import { SearchSelect } from '../components/ui/SearchSelect'
 import { Badge } from '../components/ui/Badge'
 import { Modal } from '../components/ui/Modal'
+import { Field } from '../components/ui/Field'
+import { SelectField } from '../components/ui/SelectField'
 import { useProductStore } from '../stores/useProductStore'
 import { useCategoryStore } from '../stores/useCategoryStore'
 import { usePurchaseStore } from '../stores/usePurchaseStore'
 import { useProducts } from '../hooks/useProducts'
 import { usePurchases } from '../hooks/usePurchases'
+import { purchaseEntrySchema } from '../lib/validation'
 import type { PurchaseItem as PurchaseItemType } from '../types'
 import { config } from '../config'
 
@@ -38,14 +41,6 @@ export function Purchases() {
 
   // Current item being configured
   const [selectedProductId, setSelectedProductId] = useState('')
-  const [currentCost, setCurrentCost] = useState('')
-  const [currentQuantity, setCurrentQuantity] = useState('1')
-  const [createNewMode, setCreateNewMode] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newBarcode, setNewBarcode] = useState('')
-  const [newBrand, setNewBrand] = useState('')
-  const [newCategoryId, setNewCategoryId] = useState('')
-  const [newDescription, setNewDescription] = useState('')
   const [saving, setSaving] = useState(false)
 
   const products = useProductStore((s) => s.products)
@@ -75,38 +70,27 @@ export function Purchases() {
     [entries]
   )
 
-  const resetCurrent = useCallback(() => {
-    setSelectedProductId('')
-    setCurrentCost('')
-    setCurrentQuantity('1')
-    setCreateNewMode(false)
-    setNewName('')
-    setNewBarcode('')
-    setNewBrand('')
-    setNewCategoryId('')
-    setNewDescription('')
-  }, [])
+  const handleAddEntry = useCallback((
+    values: typeof purchaseEntryInitialValues,
+    resetForm: () => void,
+  ) => {
+    const qty = parseInt(values.quantity, 10) || 0
+    const cost = parseFloat(values.cost) || 0
 
-  const addEntry = useCallback(() => {
-    const qty = parseInt(currentQuantity, 10) || 0
-    const cost = parseFloat(currentCost) || 0
-    if (qty <= 0) return
-
-    if (createNewMode) {
-      if (!newName.trim()) return
+    if (values.createNewMode) {
       setEntries((prev) => [
         ...prev,
         {
           tempId: crypto.randomUUID(),
           productId: null,
-          productName: newName.trim(),
-          barcode: newBarcode.trim(),
-          brand: newBrand.trim(),
-          categoryId: newCategoryId,
+          productName: values.newName.trim(),
+          barcode: values.newBarcode.trim(),
+          brand: values.newBrand.trim(),
+          categoryId: values.newCategoryId,
           cost,
           quantity: qty,
           isNew: true,
-          description: newDescription.trim(),
+          description: values.newDescription.trim(),
         },
       ])
     } else if (selectedProduct) {
@@ -125,12 +109,22 @@ export function Purchases() {
           description: selectedProduct.description,
         },
       ])
-    } else {
-      return
     }
 
-    resetCurrent()
-  }, [currentQuantity, currentCost, createNewMode, newName, newBarcode, newBrand, newCategoryId, newDescription, selectedProduct, resetCurrent])
+    setSelectedProductId('')
+    resetForm()
+  }, [selectedProduct])
+
+  const purchaseEntryInitialValues = {
+    cost: '',
+    quantity: '1',
+    createNewMode: false as boolean,
+    newName: '',
+    newBarcode: '',
+    newBrand: '',
+    newCategoryId: '',
+    newDescription: '',
+  }
 
   const removeEntry = useCallback((tempId: string) => {
     setEntries((prev) => prev.filter((e) => e.tempId !== tempId))
@@ -175,9 +169,9 @@ export function Purchases() {
 
     setSaving(false)
     setEntries([])
-    resetCurrent()
+    setSelectedProductId('')
     setInvoiceDate(new Date().toISOString().split('T')[0])
-  }, [entries, categories, addProduct, increaseStock, updateProduct, addPurchase, invoiceDate, resetCurrent])
+  }, [entries, categories, addProduct, increaseStock, updateProduct, addPurchase, invoiceDate])
 
   const canPreview = entries.length > 0
 
@@ -230,117 +224,105 @@ export function Purchases() {
           </div>
 
           {/* Buscador único */}
-          <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
-              <div className="flex-1 min-w-0">
-                {!createNewMode ? (
-                  <SearchSelect
-                    label="Buscar producto existente"
-                    options={productOptions}
-                    value={selectedProductId}
-                    onChange={(val) => { setSelectedProductId(val); setCreateNewMode(false) }}
-                    placeholder="Nombre o código de barras..."
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Badge variant="warning">Nuevo producto — se creará al guardar</Badge>
+          <Formik
+            initialValues={purchaseEntryInitialValues}
+            validationSchema={purchaseEntrySchema}
+            validate={(values) => {
+              const errs: Record<string, string> = {}
+              if (!values.createNewMode && !selectedProductId) {
+                errs.productId = 'Seleccioná o creá un producto'
+              }
+              return errs
+            }}
+            onSubmit={(values, { resetForm }) => {
+              handleAddEntry(values, resetForm)
+            }}
+          >
+            {({ values, setFieldValue, errors }) => (
+              <Form>
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+                    <div className="flex-1 min-w-0">
+                      {!values.createNewMode ? (
+                        <SearchSelect
+                          label="Buscar producto existente"
+                          options={productOptions}
+                          value={selectedProductId}
+                          onChange={(val) => { setSelectedProductId(val); setFieldValue('createNewMode', false) }}
+                          placeholder="Nombre o código de barras..."
+                          error={(errors as any).productId}
+                        />
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Badge variant="warning">Nuevo producto — se creará al guardar</Badge>
+                            <button
+                              type="button"
+                              onClick={() => setFieldValue('createNewMode', false)}
+                              className="text-[11px] text-muted hover:text-danger-text transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <Field name="newName" label="Nombre *" placeholder="Ej: Lapicera Bic Azul" />
+                            <Field name="newBarcode" label="Código de barras" placeholder="Opcional" />
+                            <Field name="newBrand" label="Marca" placeholder="Ej: Bic" />
+                            <SelectField name="newCategoryId" label="Categoría" placeholder="Seleccionar" options={catOptions} />
+                            <Field name="newDescription" label="Descripción" placeholder="Opcional" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {!values.createNewMode && (
                       <button
-                        onClick={() => setCreateNewMode(false)}
-                        className="text-[11px] text-muted hover:text-danger-text transition-colors"
+                        type="button"
+                        onClick={() => { setFieldValue('createNewMode', true); setSelectedProductId('') }}
+                        className="text-left sm:text-right text-[11px] text-primary-light hover:underline whitespace-nowrap shrink-0"
                       >
-                        Cancelar
+                        ¿No existe? Crear nuevo
                       </button>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <Input
-                        label="Nombre *"
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        placeholder="Ej: Lapicera Bic Azul"
-                      />
-                      <Input
-                        label="Código de barras"
-                        value={newBarcode}
-                        onChange={(e) => setNewBarcode(e.target.value)}
-                        placeholder="Opcional"
-                      />
-                      <Input
-                        label="Marca"
-                        value={newBrand}
-                        onChange={(e) => setNewBrand(e.target.value)}
-                        placeholder="Ej: Bic"
-                      />
-                      <Select
-                        label="Categoría"
-                        options={catOptions}
-                        placeholder="Seleccionar"
-                        value={newCategoryId}
-                        onChange={(e) => setNewCategoryId(e.target.value)}
-                      />
-                      <Input
-                        label="Descripción"
-                        value={newDescription}
-                        onChange={(e) => setNewDescription(e.target.value)}
-                        placeholder="Opcional"
-                      />
-                    </div>
+                    )}
                   </div>
-                )}
-              </div>
-              {!createNewMode && (
-                <button
-                  onClick={() => { setCreateNewMode(true); setSelectedProductId('') }}
-                  className="text-left sm:text-right text-[11px] text-primary-light hover:underline whitespace-nowrap shrink-0"
-                >
-                  ¿No existe? Crear nuevo
-                </button>
-              )}
-            </div>
 
-            {/* Producto seleccionado / nuevo: costo + cantidad + agregar */}
-            {(selectedProduct || createNewMode) && (
-              <div className="rounded-lg border border-border bg-card p-3 space-y-3">
-                {selectedProduct && (
-                  <div>
-                    <p className="text-[13px] font-semibold text-text">{selectedProduct.name}</p>
-                    <div className="mt-1 flex items-center gap-2 flex-wrap">
-                      <code className="font-mono text-[10px] text-muted">{selectedProduct.barcode}</code>
-                      <Badge variant="success">Stock actual: {selectedProduct.stock} uds.</Badge>
-                      <Badge variant="default">Costo actual: {config.currency.symbol}{selectedProduct.cost.toFixed(2)}</Badge>
+                  {/* Producto seleccionado / nuevo: costo + cantidad + agregar */}
+                  {(selectedProduct || values.createNewMode) && (
+                    <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+                      {selectedProduct && (
+                        <div>
+                          <p className="text-[13px] font-semibold text-text">{selectedProduct.name}</p>
+                          <div className="mt-1 flex items-center gap-2 flex-wrap">
+                            <code className="font-mono text-[10px] text-muted">{selectedProduct.barcode}</code>
+                            <Badge variant="success">Stock actual: {selectedProduct.stock} uds.</Badge>
+                            <Badge variant="default">Costo actual: {config.currency.symbol}{selectedProduct.cost.toFixed(2)}</Badge>
+                          </div>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+                        <Field
+                          name="cost"
+                          label="Costo x unidad"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder={selectedProduct ? String(selectedProduct.cost) : '0.00'}
+                        />
+                        <Field
+                          name="quantity"
+                          label="Cantidad"
+                          type="number"
+                          min="1"
+                        />
+                        <Button type="submit">
+                          <CheckCircle2 size={15} /> Agregar
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                )}
-                <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
-                  <Input
-                    label="Costo x unidad"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={currentCost}
-                    onChange={(e) => setCurrentCost(e.target.value)}
-                    placeholder={selectedProduct ? String(selectedProduct.cost) : '0.00'}
-                  />
-                  <Input
-                    label="Cantidad"
-                    type="number"
-                    min="1"
-                    value={currentQuantity}
-                    onChange={(e) => setCurrentQuantity(e.target.value)}
-                  />
-                  <Button
-                    onClick={addEntry}
-                    disabled={
-                      !(parseFloat(currentCost) > 0 && parseInt(currentQuantity, 10) > 0) ||
-                      (createNewMode && !newName.trim())
-                    }
-                  >
-                    <CheckCircle2 size={15} /> Agregar
-                  </Button>
+                  )}
                 </div>
-              </div>
+              </Form>
             )}
-          </div>
+          </Formik>
 
           {/* Lista / Carrito */}
           {entries.length > 0 && (

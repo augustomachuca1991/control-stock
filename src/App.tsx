@@ -6,6 +6,7 @@ import { Products } from './pages/Products'
 import { Sales } from './pages/Sales'
 import { Categories } from './pages/Categories'
 import { Purchases } from './pages/Purchases'
+import { Invoices } from './pages/Invoices'
 import { Login } from './pages/Login'
 import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="sales" element={<Sales />} />
             <Route path="categories" element={<Categories />} />
             <Route path="purchases" element={<Purchases />} />
+            <Route path="invoices" element={<Invoices />} />
           </Route>
         </Route>
       </Routes>

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { Formik, Form } from 'formik'
 import { Menu, LogOut, Settings } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -6,6 +7,8 @@ import { useProfile } from '../../hooks/useProfile'
 import { Modal } from '../ui/Modal'
 import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
+import { Field } from '../ui/Field'
+import { profileSchema } from '../../lib/validation'
 import MarelyLogo from '../ui/MarelyLogo'
 
 const titles: Record<string, string> = {
@@ -14,6 +17,7 @@ const titles: Record<string, string> = {
   '/sales': 'Ventas',
   '/purchases': 'Compras',
   '/categories': 'Categorías',
+  '/invoices':   'Factura',
 }
 
 interface HeaderProps {
@@ -29,17 +33,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
-  const [fullName, setFullName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [saving, setSaving] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (profile) {
-      setFullName(profile.full_name)
-      setPhone(profile.phone)
-    }
-  }, [profile])
 
   useEffect(() => {
     if (!dropdownOpen) return
@@ -56,13 +50,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
     await signOut()
     navigate('/login')
   }, [signOut, navigate])
-
-  const saveProfile = useCallback(async () => {
-    setSaving(true)
-    await updateProfile({ full_name: fullName, phone })
-    setSaving(false)
-    setProfileModalOpen(false)
-  }, [fullName, phone, updateProfile])
 
   const initial = user?.email?.charAt(0).toUpperCase() ?? 'U'
 
@@ -134,15 +121,28 @@ export function Header({ onToggleSidebar }: HeaderProps) {
       </header>
 
       <Modal open={profileModalOpen} onClose={() => setProfileModalOpen(false)} title="Editar Perfil" size="sm">
-        <div className="space-y-4">
-          <Input label="Nombre completo" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Tu nombre" />
-          <Input label="Teléfono" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+54 11 1234-5678" />
-          <Input label="Email" value={user?.email ?? ''} disabled />
-        </div>
-        <div className="mt-6 flex justify-end gap-3">
-          <Button variant="gold-outline" onClick={() => setProfileModalOpen(false)}>Cancelar</Button>
-          <Button variant="gold" onClick={saveProfile} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
-        </div>
+        <Formik
+          initialValues={{ full_name: profile?.full_name ?? '', phone: profile?.phone ?? '' }}
+          validationSchema={profileSchema}
+          enableReinitialize
+          onSubmit={async (values, { setSubmitting }) => {
+            await updateProfile(values)
+            setSubmitting(false)
+            setProfileModalOpen(false)
+          }}
+        >
+          {({ isSubmitting, resetForm }) => (
+            <Form className="space-y-4">
+              <Field name="full_name" label="Nombre completo" placeholder="Tu nombre" />
+              <Field name="phone" label="Teléfono" placeholder="+54 11 1234-5678" />
+              <Input label="Email" value={user?.email ?? ''} disabled />
+              <div className="mt-6 flex justify-end gap-3">
+                <Button variant="gold-outline" type="button" onClick={() => { resetForm(); setProfileModalOpen(false) }}>Cancelar</Button>
+                <Button variant="gold" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar'}</Button>
+              </div>
+            </Form>
+          )}
+        </Formik>
       </Modal>
     </>
   )

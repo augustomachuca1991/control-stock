@@ -12,9 +12,10 @@ interface SearchSelectProps {
     onChange: (value: string) => void
     placeholder?: string
     label?: string
+    error?: string
 }
 
-export function SearchSelect({ options, value, onChange, placeholder = 'Buscar...', label }: SearchSelectProps) {
+export function SearchSelect({ options, value, onChange, placeholder = 'Buscar...', label, error }: SearchSelectProps) {
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState('')
     const containerRef = useRef<HTMLDivElement>(null)
@@ -59,7 +60,7 @@ export function SearchSelect({ options, value, onChange, placeholder = 'Buscar..
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                className="flex h-9 w-full items-center justify-between rounded-lg border border-border bg-surface px-3 text-[13px] transition-colors focus:outline-none focus:border-border-strong"
+                className={`flex h-9 w-full items-center justify-between rounded-lg border bg-surface px-3 text-[13px] transition-colors focus:outline-none focus:border-border-strong ${error ? 'border-danger/50' : 'border-border'}`}
             >
                 <span className={`truncate ${selected ? 'text-text' : 'text-muted'}`}>
                     {selected ? selected.label : placeholder}
@@ -74,6 +75,7 @@ export function SearchSelect({ options, value, onChange, placeholder = 'Buscar..
                 </div>
             </button>
 
+            {error && <p className="text-[11px] text-danger-text">{error}</p>}
             {open && (
                 <div className="absolute top-full left-0 right-0 z-[60] mt-1 rounded-lg border border-border bg-card shadow-xl">
                     <div className="border-b border-border p-2">

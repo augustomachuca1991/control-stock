@@ -1,18 +1,21 @@
 import { useState, useMemo, useCallback, useRef } from 'react'
+import { Formik, Form } from 'formik'
+import type { FormikProps } from 'formik'
 import { Plus, Minus, Trash2, FileText, AlertCircle } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
-import { Select } from '../components/ui/Select'
 import { SearchSelect } from '../components/ui/SearchSelect'
 import { Input } from '../components/ui/Input'
+import { SelectField } from '../components/ui/SelectField'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
 import { useProductStore } from '../stores/useProductStore'
 import { useSaleStore } from '../stores/useSaleStore'
 import { useSales } from '../hooks/useSales'
 import { useProducts } from '../hooks/useProducts'
-import type { Sale, SaleStatus } from '../types'
+import { saleSchema } from '../lib/validation'
+import type { Sale, SaleStatus, PaymentMethod } from '../types'
 import { config } from '../config'
 
 interface CartItem {
@@ -28,14 +31,15 @@ export function Sales() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [selectedProductId, setSelectedProductId] = useState('')
   const [quantity, setQuantity] = useState('1')
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [receiptOpen, setReceiptOpen] = useState(false)
   const [lastSale, setLastSale] = useState<Sale | null>(null)
   const [voidConfirmOpen, setVoidConfirmOpen] = useState(false)
   const [saleToVoid, setSaleToVoid] = useState<Sale | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [previewPaymentMethod, setPreviewPaymentMethod] = useState<PaymentMethod>('cash')
   const quantityRef = useRef<HTMLInputElement>(null)
+  const saleFormikRef = useRef<FormikProps<{ paymentMethod: PaymentMethod }>>(null)
 
   const products = useProductStore((s) => s.products)
   const sales = useSaleStore((s) => s.sales)
@@ -47,7 +51,6 @@ export function Sales() {
     setCart([])
     setSelectedProductId('')
     setQuantity('1')
-    setPaymentMethod('cash')
     setModalOpen(true)
   }, [])
 
@@ -94,6 +97,7 @@ export function Sales() {
 
   const handleConfirmSale = useCallback(async () => {
     setConfirming(true)
+    const paymentMethod = saleFormikRef.current?.values.paymentMethod ?? 'cash'
     const { data: sale } = await createSale({
       items: cart.map((c) => ({
         productId: c.productId,
@@ -112,7 +116,7 @@ export function Sales() {
     setModalOpen(false)
     setCart([])
     if (sale) setReceiptOpen(true)
-  }, [cart, paymentMethod, createSale, reduceStock])
+  }, [cart, createSale, reduceStock])
 
   const [voiding, setVoiding] = useState(false)
 
@@ -207,68 +211,86 @@ export function Sales() {
       </Card>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nueva Venta" size="lg">
-        <div className="space-y-4">
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="flex-1">
-                <SearchSelect
-                  label="Producto"
-                  options={productOptions}
-                  value={selectedProductId}
-                  onChange={setSelectedProductId}
-                  placeholder="Buscar por nombre o código de barras..."
-                />
-              </div>
-              <div className="w-full sm:w-24">
-                <Input ref={quantityRef} label="Cant." type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-              </div>
-            </div>
-            <Button onClick={addToCart} disabled={!selectedProductId}><Plus size={16} /> Agregar</Button>
-          </div>
-
-          {cart.length > 0 && (
-            <div className="rounded-lg border border-border bg-surface">
-              <div className="border-b border-border px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Carrito</div>
-              {cart.map((item) => (
-                <div key={item.productId} className="flex items-center justify-between border-b border-border/50 px-4 py-2.5 last:border-0">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium text-text truncate">{item.productName}</p>
-                    <p className="text-[11px] text-muted">{config.currency.symbol}{item.unitPrice.toFixed(2)} c/u</p>
+        <Formik
+          innerRef={saleFormikRef}
+          initialValues={{ paymentMethod: 'cash' as PaymentMethod }}
+          validationSchema={saleSchema}
+          validate={() => {
+            if (cart.length === 0) return { cart: 'Agregá al menos un producto' }
+            return {}
+          }}
+          onSubmit={() => {
+            setPreviewPaymentMethod(saleFormikRef.current?.values.paymentMethod ?? 'cash')
+            setPreviewOpen(true)
+          }}
+        >
+          {({ errors, submitForm }) => (
+            <Form>
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="flex-1">
+                      <SearchSelect
+                        label="Producto"
+                        options={productOptions}
+                        value={selectedProductId}
+                        onChange={setSelectedProductId}
+                        placeholder="Buscar por nombre o código de barras..."
+                      />
+                    </div>
+                    <div className="w-full sm:w-24">
+                      <Input ref={quantityRef} label="Cant." type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button variant="gold-outline" size="sm" onClick={() => updateCartQty(item.productId, -1)}><Minus size={14} /></Button>
-                    <span className="w-8 text-center text-[13px] font-medium text-text">{item.quantity}</span>
-                    <Button variant="gold" size="sm" onClick={() => updateCartQty(item.productId, 1)}><Plus size={14} /></Button>
-                    <Button variant="surface" size="sm" onClick={() => removeFromCart(item.productId)}><Trash2 size={14} className="text-danger-text" /></Button>
-                  </div>
+                  <Button onClick={addToCart} disabled={!selectedProductId}><Plus size={16} /> Agregar</Button>
                 </div>
-              ))}
-              <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-                <span className="text-[13px] font-semibold text-text">Total</span>
-                <span className="text-[18px] font-bold text-accent">{config.currency.symbol}{cartTotal.toFixed(2)}</span>
+
+                {cart.length > 0 && (
+                  <div className="rounded-lg border border-border bg-surface">
+                    <div className="border-b border-border px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Carrito</div>
+                    {cart.map((item) => (
+                      <div key={item.productId} className="flex items-center justify-between border-b border-border/50 px-4 py-2.5 last:border-0">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium text-text truncate">{item.productName}</p>
+                          <p className="text-[11px] text-muted">{config.currency.symbol}{item.unitPrice.toFixed(2)} c/u</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button variant="gold-outline" size="sm" onClick={() => updateCartQty(item.productId, -1)}><Minus size={14} /></Button>
+                          <span className="w-8 text-center text-[13px] font-medium text-text">{item.quantity}</span>
+                          <Button variant="gold" size="sm" onClick={() => updateCartQty(item.productId, 1)}><Plus size={14} /></Button>
+                          <Button variant="surface" size="sm" onClick={() => removeFromCart(item.productId)}><Trash2 size={14} className="text-danger-text" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+                      <span className="text-[13px] font-semibold text-text">Total</span>
+                      <span className="text-[18px] font-bold text-accent">{config.currency.symbol}{cartTotal.toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+
+                <SelectField
+                  name="paymentMethod"
+                  label="Método de Pago"
+                  options={[
+                    { value: 'cash', label: 'Efectivo' },
+                    { value: 'card', label: 'Tarjeta' },
+                    { value: 'transfer', label: 'Transferencia' },
+                  ]}
+                />
+
+                {(errors as any).cart && <p className="text-[11px] text-danger-text">{(errors as any).cart}</p>}
               </div>
-            </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <Button variant="surface" type="button" onClick={() => setModalOpen(false)}>Cancelar</Button>
+                <Button type="button" onClick={() => submitForm()} disabled={cart.length === 0}>
+                  Previsualizar ({config.currency.symbol}{cartTotal.toFixed(2)})
+                </Button>
+              </div>
+            </Form>
           )}
-
-          <Select
-            label="Método de Pago"
-            options={[
-              { value: 'cash', label: 'Efectivo' },
-              { value: 'card', label: 'Tarjeta' },
-              { value: 'transfer', label: 'Transferencia' },
-            ]}
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value as 'cash' | 'card' | 'transfer')}
-          />
-        </div>
-
-        <div className="mt-6 flex justify-end gap-3">
-          <Button variant="surface" onClick={() => setModalOpen(false)}>Cancelar</Button>
-          <Button onClick={() => setPreviewOpen(true)} disabled={cart.length === 0}>
-            Previsualizar ({config.currency.symbol}{cartTotal.toFixed(2)})
-          </Button>
-        </div>
+        </Formik>
       </Modal>
 
       {/* Preview / Comprobante */}
@@ -314,7 +336,7 @@ export function Sales() {
 
           <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-2.5 text-[12px]">
             <span className="text-muted">Método de pago</span>
-            <Badge variant={paymentVariants[paymentMethod]}>{paymentLabels[paymentMethod]}</Badge>
+            <Badge variant={paymentVariants[previewPaymentMethod]}>{paymentLabels[previewPaymentMethod]}</Badge>
           </div>
         </div>
 

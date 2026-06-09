@@ -1,5 +1,6 @@
 export const config = {
   storeName: import.meta.env.VITE_STORE_NAME || 'Librería y Papelería',
+  invoiceWebhookUrl: import.meta.env.VITE_INVOICE_WEBHOOK_URL || '',
   currency: {
     symbol: import.meta.env.VITE_CURRENCY_SYMBOL || '$',
     code: import.meta.env.VITE_CURRENCY_CODE || 'ARS',

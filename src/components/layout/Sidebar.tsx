@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Package, ShoppingCart, Tags, ClipboardList, LogOut } from 'lucide-react'
+import { LayoutDashboard, Package, ShoppingCart, Tags, ClipboardList, FileText, LogOut } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import MarelyLogo from '../ui/MarelyLogo'
 
@@ -10,6 +10,7 @@ const links = [
   { to: '/sales',     label: 'Ventas',     icon: ShoppingCart },
   { to: '/purchases', label: 'Compras',    icon: ClipboardList },
   { to: '/categories',label: 'Categorías', icon: Tags },
+  { to: '/invoices',  label: 'Factura',    icon: FileText },
 ]
 
 interface SidebarProps {
