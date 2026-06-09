@@ -32,7 +32,9 @@ export function Select({ label, placeholder, error, options, className = '', ...
           </option>
         ))}
       </select>
-      {error && <p className="text-[11px] text-danger-text">{error}</p>}
+      <div className="min-h-[18px]">
+        {error && <p className="text-[11px] text-danger-text">{error}</p>}
+      </div>
     </div>
   )
 }

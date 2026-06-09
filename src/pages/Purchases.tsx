@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { Formik, Form } from 'formik'
-import { Trash2, Package, FileText, CheckCircle2, History, ShoppingCart } from 'lucide-react'
+import { Trash2, Package, FileText, Check, History, ShoppingCart } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -227,21 +227,14 @@ export function Purchases() {
           <Formik
             initialValues={purchaseEntryInitialValues}
             validationSchema={purchaseEntrySchema}
-            validate={(values) => {
-              const errs: Record<string, string> = {}
-              if (!values.createNewMode && !selectedProductId) {
-                errs.productId = 'Seleccioná o creá un producto'
-              }
-              return errs
-            }}
             onSubmit={(values, { resetForm }) => {
               handleAddEntry(values, resetForm)
             }}
           >
-            {({ values, setFieldValue, errors }) => (
+            {({ values, setFieldValue }) => (
               <Form>
                 <div className="space-y-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
                     <div className="flex-1 min-w-0">
                       {!values.createNewMode ? (
                         <SearchSelect
@@ -250,7 +243,6 @@ export function Purchases() {
                           value={selectedProductId}
                           onChange={(val) => { setSelectedProductId(val); setFieldValue('createNewMode', false) }}
                           placeholder="Nombre o código de barras..."
-                          error={(errors as any).productId}
                         />
                       ) : (
                         <div className="space-y-3">
@@ -298,7 +290,7 @@ export function Purchases() {
                           </div>
                         </div>
                       )}
-                      <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+                      <div className="flex flex-col gap-3 sm:grid sm:grid-cols-[1fr_1fr_auto] sm:items-end sm:gap-3">
                         <Field
                           name="cost"
                           label="Costo x unidad"
@@ -313,8 +305,8 @@ export function Purchases() {
                           type="number"
                           min="1"
                         />
-                        <Button type="submit">
-                          <CheckCircle2 size={15} /> Agregar
+                        <Button type="submit" size="sm" className="w-full sm:w-auto">
+                          <Check size={15} /> Agregar
                         </Button>
                       </div>
                     </div>

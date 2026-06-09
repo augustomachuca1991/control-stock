@@ -75,7 +75,9 @@ export function SearchSelect({ options, value, onChange, placeholder = 'Buscar..
                 </div>
             </button>
 
-            {error && <p className="text-[11px] text-danger-text">{error}</p>}
+            <div className="min-h-[18px]">
+              {error && <p className="text-[11px] text-danger-text">{error}</p>}
+            </div>
             {open && (
                 <div className="absolute top-full left-0 right-0 z-[60] mt-1 rounded-lg border border-border bg-card shadow-xl">
                     <div className="border-b border-border p-2">

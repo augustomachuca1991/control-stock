@@ -33,7 +33,7 @@ export function Login() {
               <MarelyLogo width={160} />
 
               <div className="w-full space-y-3">
-                <Field name="email" label="Email" type="email" placeholder="tu@email.com" icon={<Mail size={14} />} />
+                <Field name="email" label="Email" type="email" placeholder="example@email.com" icon={<Mail size={14} />} />
                 <Field name="password" label="Contraseña" type="password" placeholder="••••••••" icon={<Lock size={14} />} />
               </div>
 
