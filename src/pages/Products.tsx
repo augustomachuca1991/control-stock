@@ -263,10 +263,10 @@ export function Products() {
                         className="hidden"
                         id="product-image-upload"
                       />
-                      <Button variant="gold-outline" size="sm" onClick={() => document.getElementById('product-image-upload')?.click()}>
+                      <Button variant="gold-outline" size="sm" type="button" onClick={() => document.getElementById('product-image-upload')?.click()}>
                         <Upload size={13} /> Subir imagen
                       </Button>
-                      <Button variant="surface" size="sm" onClick={() => setFieldValue('images', [...values.images, ''])}>
+                      <Button variant="surface" size="sm" type="button" onClick={() => setFieldValue('images', [...values.images, ''])}>
                         <Plus size={13} /> Agregar URL
                       </Button>
                     </div>

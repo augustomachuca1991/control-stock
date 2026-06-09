@@ -86,7 +86,7 @@ export function Categories() {
               <Field name="name" label="Nombre" placeholder="Ej: Ficción" />
               <Field name="description" label="Descripción" placeholder="Descripción breve de la categoría" />
               <div className="mt-6 flex justify-end gap-3">
-                <Button variant="gold-outline" size="md" onClick={() => { resetForm(); setModalOpen(false) }}>Cancelar</Button>
+                <Button variant="gold-outline" size="md" type="button" onClick={() => { resetForm(); setModalOpen(false) }}>Cancelar</Button>
                 <Button variant="gold" size="md" type="submit" disabled={isSubmitting || saving}>
                   {saving ? 'Guardando...' : (editingId ? 'Guardar' : 'Crear')}
                 </Button>

@@ -256,10 +256,10 @@ export function Sales() {
                           <p className="text-[11px] text-muted">{config.currency.symbol}{item.unitPrice.toFixed(2)} c/u</p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <Button variant="gold-outline" size="sm" onClick={() => updateCartQty(item.productId, -1)}><Minus size={14} /></Button>
+                          <Button variant="gold-outline" size="sm" type="button" onClick={() => updateCartQty(item.productId, -1)}><Minus size={14} /></Button>
                           <span className="w-8 text-center text-[13px] font-medium text-text">{item.quantity}</span>
-                          <Button variant="gold" size="sm" onClick={() => updateCartQty(item.productId, 1)}><Plus size={14} /></Button>
-                          <Button variant="surface" size="sm" onClick={() => removeFromCart(item.productId)}><Trash2 size={14} className="text-danger-text" /></Button>
+                          <Button variant="gold" size="sm" type="button" onClick={() => updateCartQty(item.productId, 1)}><Plus size={14} /></Button>
+                          <Button variant="surface" size="sm" type="button" onClick={() => removeFromCart(item.productId)}><Trash2 size={14} className="text-danger-text" /></Button>
                         </div>
                       </div>
                     ))}
