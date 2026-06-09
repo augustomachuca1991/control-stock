@@ -43,6 +43,26 @@ export type PaymentMethod = 'cash' | 'card' | 'transfer'
 
 export type SaleStatus = 'active' | 'voided'
 
+export interface InvoiceItem {
+  productName: string
+  barcode: string
+  quantity: number
+  unitCost: number
+  isNew: boolean
+}
+
+export interface Invoice {
+  id: string
+  fileName: string
+  date: string
+  total: number
+  items: InvoiceItem[]
+  imageUrl?: string
+  status: 'processed' | 'failed'
+  userId?: string
+  createdAt: number
+}
+
 export interface Profile {
   id: string
   full_name: string

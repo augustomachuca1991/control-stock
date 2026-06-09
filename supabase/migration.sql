@@ -140,3 +140,26 @@ create policy "auth_product_images_delete"
   on storage.objects for delete using (
     bucket_id = 'product-images' and auth.role() = 'authenticated'
   );
+
+-- 7. TABLA INVOICES ---------------------------------------------
+
+create table invoices (
+  id         uuid primary key default gen_random_uuid(),
+  file_name  text not null default '',
+  date       text not null default '',
+  total      numeric not null default 0,
+  items      jsonb not null default '[]'::jsonb,
+  image_url  text not null default '',
+  status     text not null default 'processed',
+  user_id    uuid not null default auth.uid() references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
+alter table invoices enable row level security;
+
+create policy "auth_invoices_select" on invoices for select using (auth.role() = 'authenticated');
+create policy "auth_invoices_insert" on invoices for insert with check (auth.role() = 'authenticated');
+create policy "auth_invoices_update" on invoices for update using (auth.role() = 'authenticated');
+create policy "auth_invoices_delete" on invoices for delete using (auth.role() = 'authenticated');
+
+create index idx_invoices_created_at on invoices(created_at desc);

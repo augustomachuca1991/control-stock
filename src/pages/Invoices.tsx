@@ -9,8 +9,9 @@ import { toast } from 'sonner'
 import { Select } from '../components/ui/Select'
 import { useProducts } from '../hooks/useProducts'
 import { usePurchases } from '../hooks/usePurchases'
+import { useInvoices } from '../hooks/useInvoices'
 import { useCategoryStore } from '../stores/useCategoryStore'
-import type { PurchaseItem } from '../types'
+import type { PurchaseItem, InvoiceItem } from '../types'
 
 interface DetectedItem {
   productName: string
@@ -35,8 +36,10 @@ export function Invoices() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [defaultCategoryId, setDefaultCategoryId] = useState('')
+  const [categoryError, setCategoryError] = useState('')
   const { products, add: addProduct, update: updateProduct, increaseStock } = useProducts()
   const { add: addPurchase } = usePurchases()
+  const { invoices, add: addInvoice } = useInvoices()
   const categories = useCategoryStore((s) => s.categories)
   const inputRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
@@ -102,6 +105,13 @@ export function Invoices() {
 
   const handleConfirm = useCallback(async () => {
     if (!result) return
+
+    if (categories.length > 0 && !defaultCategoryId) {
+      setCategoryError('Seleccioná una categoría para los productos nuevos')
+      return
+    }
+    setCategoryError('')
+
     setSaving(true)
 
     const productIds = new Map<string, string>()
@@ -123,7 +133,7 @@ export function Invoices() {
             name: item.productName,
             brand: '',
             barcode: item.barcode,
-            categoryId: defaultCategoryId,
+            categoryId: defaultCategoryId || null,
             price: 0,
             cost: item.unitCost,
             stock: item.quantity,
@@ -155,6 +165,15 @@ export function Invoices() {
       })
       if (purchaseErr) throw new Error(`Error al registrar la compra: ${purchaseErr}`)
 
+      const { error: invoiceErr } = await addInvoice({
+        fileName: file?.name ?? 'factura',
+        date: result.date,
+        total: result.total,
+        items: result.items as InvoiceItem[],
+        status: 'processed',
+      })
+      if (invoiceErr) throw new Error(`Error al guardar el historial: ${invoiceErr}`)
+
       toast.success('Factura procesada correctamente')
       setSaved(true)
       setConfirmOpen(false)
@@ -170,6 +189,7 @@ export function Invoices() {
     setPreview(null)
     setResult(null)
     setSaved(false)
+    setCategoryError('')
     if (file?.type.startsWith('image/') && preview) URL.revokeObjectURL(preview)
   }, [file, preview])
 
@@ -329,8 +349,9 @@ export function Invoices() {
                   label="Categoría para productos nuevos"
                   options={categories.map((c) => ({ value: c.id, label: c.name }))}
                   value={defaultCategoryId}
-                  onChange={(e) => setDefaultCategoryId(e.target.value)}
+                  onChange={(e) => { setDefaultCategoryId(e.target.value); setCategoryError('') }}
                   placeholder="Seleccionar categoría..."
+                  error={categoryError}
                 />
               </div>
             )}
@@ -360,6 +381,35 @@ export function Invoices() {
           </div>
         )}
       </Modal>
+
+      {/* Historial */}
+      <Card title="Historial" subtitle="Facturas procesadas">
+        {invoices.length === 0 ? (
+          <p className="py-6 text-center text-[13px] text-muted">Todavía no se procesaron facturas</p>
+        ) : (
+          <div className="space-y-3">
+            {invoices.map((inv) => (
+              <div key={inv.id} className="rounded-lg border border-border bg-surface p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-semibold text-text truncate">{inv.fileName}</p>
+                    <p className="text-[11px] text-muted">
+                      {new Date(inv.createdAt).toLocaleDateString('es-ES', { dateStyle: 'long' })}
+                    </p>
+                    <p className="text-[10px] text-muted mt-1">
+                      {inv.items.length} artículo{inv.items.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-[15px] font-bold text-accent">{config.currency.symbol}{inv.total.toFixed(2)}</p>
+                    <Badge variant="success">Procesada</Badge>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   )
 }

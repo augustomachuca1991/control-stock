@@ -25,7 +25,7 @@ export function SearchSelect({ options, value, onChange, placeholder = 'Buscar..
 
     const filtered = query.trim()
         ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
-        : options
+        : options.slice(-5)
 
     useEffect(() => {
         function handleClick(e: MouseEvent) {

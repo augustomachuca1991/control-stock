@@ -181,21 +181,19 @@ export function Purchases() {
       <div className="flex gap-1 rounded-lg border border-border bg-surface p-1 w-fit">
         <button
           onClick={() => setTab('new')}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
-            tab === 'new'
-              ? 'bg-primary-dim text-primary-light'
-              : 'text-muted hover:text-muted-light'
-          }`}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${tab === 'new'
+            ? 'bg-primary-dim text-primary-light'
+            : 'text-muted hover:text-muted-light'
+            }`}
         >
           <Package size={14} /> Nuevo Ingreso
         </button>
         <button
           onClick={() => setTab('history')}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
-            tab === 'history'
-              ? 'bg-primary-dim text-primary-light'
-              : 'text-muted hover:text-muted-light'
-          }`}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${tab === 'history'
+            ? 'bg-primary-dim text-primary-light'
+            : 'text-muted hover:text-muted-light'
+            }`}
         >
           <History size={14} /> Historial ({purchases.length})
         </button>
@@ -305,7 +303,7 @@ export function Purchases() {
                           type="number"
                           min="1"
                         />
-                        <Button type="submit" size="sm" className="w-full sm:w-auto">
+                        <Button type="submit" size="sm" className="w-full sm:w-auto sm:mb-[28px]">
                           <Check size={15} /> Agregar
                         </Button>
                       </div>
