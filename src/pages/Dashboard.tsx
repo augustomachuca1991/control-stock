@@ -6,6 +6,9 @@ import { Table } from '../components/ui/Table'
 import { useProductStore } from '../stores/useProductStore'
 import { useSaleStore } from '../stores/useSaleStore'
 import { useCategoryStore } from '../stores/useCategoryStore'
+import { useProducts } from '../hooks/useProducts'
+import { useSales } from '../hooks/useSales'
+import { useCategories } from '../hooks/useCategories'
 import type { Sale } from '../types'
 import { config } from '../config'
 
@@ -72,6 +75,10 @@ function StockBar({ current, min, max }: { current: number; min: number; max: nu
 
 /* ── Dashboard ── */
 export function Dashboard() {
+  useProducts()
+  useSales()
+  useCategories()
+
   const products        = useProductStore((s) => s.products)
   const lowStock        = useMemo(() => products.filter((p) => p.stock <= p.minStock), [products])
   const getTotalRevenue = useSaleStore((s) => s.getTotalRevenue)

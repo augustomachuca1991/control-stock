@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Modal } from '../components/ui/Modal'
 import { useCategoryStore } from '../stores/useCategoryStore'
+import { useCategories } from '../hooks/useCategories'
 
 interface CategoryForm {
   name: string
@@ -17,11 +18,10 @@ export function Categories() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<CategoryForm>(emptyForm)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null)
 
   const categories = useCategoryStore((s) => s.categories)
-  const addCategory = useCategoryStore((s) => s.addCategory)
-  const updateCategory = useCategoryStore((s) => s.updateCategory)
-  const deleteCategory = useCategoryStore((s) => s.deleteCategory)
+  const { add: addCategory, update: updateCategory, delete: deleteCategory } = useCategories()
 
   const openCreate = useCallback(() => {
     setEditingId(null)
@@ -37,12 +37,12 @@ export function Categories() {
     setModalOpen(true)
   }, [categories])
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!form.name.trim()) return
     if (editingId) {
-      updateCategory(editingId, form)
+      await updateCategory(editingId, form)
     } else {
-      addCategory(form)
+      await addCategory(form)
     }
     setModalOpen(false)
   }, [form, editingId, addCategory, updateCategory])
@@ -80,7 +80,7 @@ export function Categories() {
                     <Button variant="surface" size="sm" onClick={() => openEdit(cat.id)}>
                       <Pencil size={13} />
                     </Button>
-                    <Button variant="surface" size="sm" onClick={() => deleteCategory(cat.id)}>
+                    <Button variant="surface" size="sm" onClick={() => setDeleteConfirm({ id: cat.id, name: cat.name })}>
                       <Trash2 size={13} className="text-danger-text" />
                     </Button>
                   </div>
@@ -90,6 +90,25 @@ export function Categories() {
           </div>
         )}
       </Card>
+
+      {/* Confirmar eliminación */}
+      <Modal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        title="Eliminar Categoría"
+        size="sm"
+      >
+        <p className="text-[13px] text-muted-light">
+          ¿Estás seguro de que querés eliminar <strong className="text-text">{deleteConfirm?.name}</strong>?
+          Esta acción es <strong className="text-danger-text">permanente</strong>.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="gold-outline" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
+          <Button variant="surface" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }} onClick={async () => { if (deleteConfirm) { await deleteCategory(deleteConfirm.id); setDeleteConfirm(null) } }}>
+            Eliminar
+          </Button>
+        </div>
+      </Modal>
 
       <Modal
         open={modalOpen}

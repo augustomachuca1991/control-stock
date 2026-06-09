@@ -1,17 +1,32 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, LogIn } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
 import MarelyLogo from '../components/ui/MarelyLogo'
+import { useAuth } from '../contexts/AuthContext'
 
 export function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const { signIn } = useAuth()
+  const navigate = useNavigate()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!email || !password) return
+    setLoading(true)
+    setError('')
+    const { error: err } = await signIn(email, password)
+    if (err) {
+      setError(err.message)
+      setLoading(false)
+    } else {
+      navigate('/')
+    }
   }
 
   return (
@@ -39,8 +54,12 @@ export function Login() {
             />
           </div>
 
-          <Button variant="gold" className="w-full" type="submit">
-            <LogIn size={15} /> Iniciar Sesión
+          {error && (
+            <p className="text-[12px] text-danger-text text-center">{error}</p>
+          )}
+
+          <Button variant="gold" className="w-full" type="submit" disabled={loading}>
+            <LogIn size={15} /> {loading ? 'Ingresando...' : 'Iniciar Sesión'}
           </Button>
 
           <Link

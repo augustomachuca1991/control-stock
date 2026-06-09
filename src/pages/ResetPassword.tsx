@@ -5,15 +5,23 @@ import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
 import MarelyLogo from '../components/ui/MarelyLogo'
+import { useAuth } from '../contexts/AuthContext'
 
 export function ResetPassword() {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [done, setDone] = useState(false)
+  const [error, setError] = useState('')
+  const { updatePassword } = useAuth()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (password && password === confirm) setDone(true)
+    if (!password) return
+    if (password !== confirm) { setError('Las contraseñas no coinciden'); return }
+    setError('')
+    const { error: err } = await updatePassword(password)
+    if (err) setError(err.message)
+    else setDone(true)
   }
 
   return (
@@ -62,6 +70,10 @@ export function ResetPassword() {
                   error={confirm && password !== confirm ? 'Las contraseñas no coinciden' : undefined}
                 />
               </div>
+
+              {error && (
+                <p className="text-[12px] text-danger-text text-center">{error}</p>
+              )}
 
               <Button variant="gold" className="w-full" type="submit">
                 <KeyRound size={15} /> Restablecer contraseña

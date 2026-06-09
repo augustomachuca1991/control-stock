@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from 'react'
-import { Plus, Pencil, Trash2, Search, Barcode, Image as ImageIcon, X, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Search, Image as ImageIcon, X, ChevronRight, Upload } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -8,7 +8,9 @@ import { Modal } from '../components/ui/Modal'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
 import { useProductStore } from '../stores/useProductStore'
+import { useProducts } from '../hooks/useProducts'
 import { useCategoryStore } from '../stores/useCategoryStore'
+import { useCategories } from '../hooks/useCategories'
 import type { Product } from '../types'
 import { config } from '../config'
 
@@ -23,11 +25,13 @@ interface ProductForm {
   minStock: string
   description: string
   images: string[]
+  enabled: boolean
 }
 
 const emptyForm: ProductForm = {
   name: '', brand: '', barcode: '', categoryId: '',
   price: '', cost: '', stock: '', minStock: '', description: '', images: [],
+  enabled: true,
 }
 
 function ProductThumb({ src, className }: { src?: string; className?: string }) {
@@ -51,21 +55,19 @@ function ProductThumb({ src, className }: { src?: string; className?: string }) 
 
 export function Products() {
   const [search, setSearch] = useState('')
-  const [barcodeSearch, setBarcodeSearch] = useState('')
   const [filterCat, setFilterCat] = useState('')
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<ProductForm>(emptyForm)
+  const [deleteConfirm, setDeleteConfirm] = useState<Product | null>(null)
   const barcodeRef = useRef<HTMLInputElement>(null)
-  const barcodeSearchRef = useRef<HTMLInputElement>(null)
 
+  useCategories()
   const products = useProductStore((s) => s.products)
-  const addProduct = useProductStore((s) => s.addProduct)
-  const updateProduct = useProductStore((s) => s.updateProduct)
-  const deleteProduct = useProductStore((s) => s.deleteProduct)
   const getProductById = useProductStore((s) => s.getProductById)
+  const { uploadImage, add: addProduct, update: updateProduct, delete: deleteProduct } = useProducts()
   const categories = useCategoryStore((s) => s.categories)
 
   const filtered = useMemo(() => {
@@ -78,10 +80,9 @@ export function Products() {
         p.barcode.includes(q)
       )
     }
-    if (barcodeSearch) result = result.filter((p) => p.barcode.includes(barcodeSearch))
     if (filterCat) result = result.filter((p) => p.categoryId === filterCat)
     return result
-  }, [products, search, barcodeSearch, filterCat])
+  }, [products, search, filterCat])
 
   const openCreate = useCallback(() => {
     setEditingId(null)
@@ -99,6 +100,7 @@ export function Products() {
       name: p.name, brand: p.brand, barcode: p.barcode, categoryId: p.categoryId,
       price: String(p.price), cost: String(p.cost), stock: String(p.stock),
       minStock: String(p.minStock), description: p.description, images: p.images ?? [],
+      enabled: p.enabled ?? true,
     })
     setFormModalOpen(true)
     setTimeout(() => barcodeRef.current?.focus(), 100)
@@ -109,7 +111,7 @@ export function Products() {
     setDetailModalOpen(true)
   }, [])
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     const numeric = (v: string) => parseFloat(v) || 0
     const int = (v: string) => parseInt(v, 10) || 0
     const base = {
@@ -117,25 +119,18 @@ export function Products() {
       price: numeric(form.price), cost: numeric(form.cost),
       stock: int(form.stock), minStock: int(form.minStock),
       description: form.description, images: form.images.filter(Boolean),
+      enabled: form.enabled,
     }
-    if (editingId) updateProduct(editingId, base)
-    else addProduct(base)
+    if (editingId) await updateProduct(editingId, base)
+    else await addProduct(base)
     setFormModalOpen(false)
   }, [form, editingId, addProduct, updateProduct])
 
-  const handleBarcodeSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault()
-    if (barcodeSearch) {
-      const found = products.find((p) => p.barcode === barcodeSearch)
-      if (found) { setSearch(found.name); setBarcodeSearch('') }
-      barcodeSearchRef.current?.focus()
-    }
-  }, [barcodeSearch, products])
-
-  const handleDelete = useCallback((e: React.MouseEvent, id: string) => {
-    e.stopPropagation()
-    deleteProduct(id)
-  }, [deleteProduct])
+  const confirmDelete = useCallback(async () => {
+    if (!deleteConfirm) return
+    await deleteProduct(deleteConfirm.id)
+    setDeleteConfirm(null)
+  }, [deleteConfirm, deleteProduct])
 
   const addImageUrl = useCallback(() => setForm((prev) => ({ ...prev, images: [...prev.images, ''] })), [])
   const updateImageUrl = useCallback((index: number, value: string) => {
@@ -144,6 +139,16 @@ export function Products() {
   const removeImageUrl = useCallback((index: number) => {
     setForm((prev) => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }))
   }, [])
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleUploadImage = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const { url } = await uploadImage(file)
+    if (url) setForm((prev) => ({ ...prev, images: [...prev.images, url] }))
+    if (e.target) e.target.value = ''
+  }, [uploadImage])
 
   const categoryName = useCallback(
     (id: string) => categories.find((c) => c.id === id)?.name ?? '-',
@@ -164,12 +169,10 @@ export function Products() {
       render: (p: Product) => <span className="text-muted-light">{p.brand}</span>,
     },
     {
-      key: 'barcode', header: 'Código',
-      render: (p: Product) => (
-        <code className="rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[11px] text-muted-light">
-          {p.barcode}
-        </code>
-      ),
+      key: 'enabled', header: 'Estado',
+      render: (p: Product) => p.enabled
+        ? <Badge variant="success">Activo</Badge>
+        : <Badge variant="danger">Inactivo</Badge>,
     },
     {
       key: 'category', header: 'Categoría',
@@ -196,9 +199,10 @@ export function Products() {
           <Button variant="surface" size="sm" onClick={(e) => openEdit(e, p.id)}>
             <Pencil size={14} className="text-muted-light" />
           </Button>
-          <Button variant="surface" size="sm" onClick={(e) => handleDelete(e, p.id)}>
+          {/* Delete button ocultado — disponible solo para admin en el futuro */}
+          {/* <Button variant="surface" size="sm" onClick={(e) => handleDeleteClick(e, p)}>
             <Trash2 size={14} className="text-danger-text" />
-          </Button>
+          </Button> */}
         </div>
       ),
     },
@@ -227,15 +231,6 @@ export function Products() {
               icon={<Search size={15} className="text-muted" />}
             />
           </div>
-          <form onSubmit={handleBarcodeSubmit} className="w-52">
-            <Input
-              ref={barcodeSearchRef}
-              placeholder="Escanear código de barras..."
-              value={barcodeSearch}
-              onChange={(e) => setBarcodeSearch(e.target.value)}
-              icon={<Barcode size={15} className="text-muted" />}
-            />
-          </form>
           <div className="w-44">
             <Select
               options={catOptions}
@@ -261,9 +256,19 @@ export function Products() {
                     <p className="font-semibold text-text">{p.name}</p>
                     <p className="text-[11px] text-muted">{p.brand}</p>
                   </div>
-                  <ChevronRight size={16} className="mt-1 shrink-0 text-muted" />
+                  <div className="flex shrink-0 gap-1">
+                    <Button variant="surface" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(e, p.id) }}>
+                      <Pencil size={13} className="text-muted-light" />
+                    </Button>
+                    {/* Delete button ocultado — disponible solo para admin en el futuro */}
+                    {/* <Button variant="surface" size="sm" onClick={(e) => handleDeleteClick(e, p)}>
+                      <Trash2 size={13} className="text-danger-text" />
+                    </Button> */}
+                    <ChevronRight size={16} className="mt-0.5 text-muted" />
+                  </div>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                  {!p.enabled && <Badge variant="danger">Deshabilitado</Badge>}
                   <Badge variant="default">{categoryName(p.categoryId)}</Badge>
                   <span className="font-bold text-accent">{config.currency.symbol}{p.price.toFixed(2)}</span>
                   <span className={p.stock <= p.minStock ? 'font-bold text-danger-text' : 'text-muted-light'}>
@@ -303,6 +308,16 @@ export function Products() {
           <Input label={`Costo (${config.currency.code})`} type="number" step="0.01" min="0" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
           <Input label="Stock" type="number" min="0" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
           <Input label="Stock Mínimo" type="number" min="0" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
+          <div className="sm:col-span-2 flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, enabled: !form.enabled })}
+              className={`relative h-6 w-11 rounded-full transition-colors ${form.enabled ? 'bg-success' : 'bg-border'}`}
+            >
+              <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${form.enabled ? 'translate-x-5' : ''}`} />
+            </button>
+            <span className="text-[13px] text-text">{form.enabled ? 'Producto habilitado' : 'Producto deshabilitado'}</span>
+          </div>
 
           {/* Imágenes */}
           <div className="sm:col-span-2 space-y-2">
@@ -310,9 +325,21 @@ export function Products() {
               <span className="text-[11px] font-semibold uppercase tracking-[0.6px] text-muted">
                 Imágenes (opcional)
               </span>
-              <Button variant="gold-outline" size="sm" onClick={addImageUrl}>
-                <Plus size={13} /> Agregar URL
-              </Button>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleUploadImage}
+                  className="hidden"
+                />
+                <Button variant="gold-outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Upload size={13} /> Subir imagen
+                </Button>
+                <Button variant="surface" size="sm" onClick={addImageUrl}>
+                  <Plus size={13} /> Agregar URL
+                </Button>
+              </div>
             </div>
             {form.images.map((url, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -326,7 +353,7 @@ export function Products() {
               </div>
             ))}
             {form.images.length === 0 && (
-              <p className="text-[11px] text-muted">Sin imágenes. Podés agregar URLs más tarde.</p>
+              <p className="text-[11px] text-muted">Sin imágenes. Podés subir o pegar URLs.</p>
             )}
           </div>
 
@@ -339,6 +366,23 @@ export function Products() {
           <Button variant="gold" onClick={handleSave}>
             {editingId ? 'Guardar Cambios' : 'Crear Producto'}
           </Button>
+        </div>
+      </Modal>
+
+      {/* Modal confirmar eliminación */}
+      <Modal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        title="Eliminar Producto"
+        size="sm"
+      >
+        <p className="text-[13px] text-muted-light">
+          ¿Estás seguro de que querés eliminar <strong className="text-text">{deleteConfirm?.name}</strong>?
+          Esta acción es <strong className="text-danger-text">permanente</strong>.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="gold-outline" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
+          <Button variant="surface" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }} onClick={confirmDelete}>Eliminar</Button>
         </div>
       </Modal>
 

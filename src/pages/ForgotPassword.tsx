@@ -5,14 +5,21 @@ import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
 import MarelyLogo from '../components/ui/MarelyLogo'
+import { useAuth } from '../contexts/AuthContext'
 
 export function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+  const { resetPassword } = useAuth()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (email.trim()) setSent(true)
+    if (!email.trim()) return
+    setError('')
+    const { error: err } = await resetPassword(email)
+    if (err) setError(err.message)
+    else setSent(true)
   }
 
   return (
@@ -53,6 +60,10 @@ export function ForgotPassword() {
                   icon={<Mail size={14} />}
                 />
               </div>
+
+              {error && (
+                <p className="text-[12px] text-danger-text text-center">{error}</p>
+              )}
 
               <Button variant="gold" className="w-full" type="submit">
                 <Send size={15} /> Enviar enlace

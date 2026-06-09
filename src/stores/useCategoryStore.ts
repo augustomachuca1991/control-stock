@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import type { Category } from '../types'
-import { categories as initialCategories } from '../data/mockData'
 
 interface CategoryState {
   categories: Category[]
@@ -11,7 +10,7 @@ interface CategoryState {
 }
 
 export const useCategoryStore = create<CategoryState>((set, get) => ({
-  categories: initialCategories,
+  categories: [],
   addCategory: (category) =>
     set((state) => ({
       categories: [...state.categories, { ...category, id: `cat-${Date.now()}` }],

@@ -28,14 +28,14 @@ export function Modal({ open, onClose, title, size = 'md', children }: ModalProp
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-0 sm:items-center sm:p-4">
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className={`relative w-full ${sizes[size]} rounded-[10px] border border-border bg-card shadow-xl`}>
+      <div className={`relative flex max-h-dvh w-full flex-col ${sizes[size]} rounded-none border-0 bg-card shadow-xl sm:rounded-[10px] sm:border sm:border-border`}>
         {title && (
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-5 py-4">
             <h2 className="text-[13px] font-semibold text-text">{title}</h2>
             <button
               onClick={onClose}
@@ -45,7 +45,7 @@ export function Modal({ open, onClose, title, size = 'md', children }: ModalProp
             </button>
           </div>
         )}
-        <div className="overflow-visible p-5">{children}</div>
+        <div className="overflow-y-auto p-5">{children}</div>
       </div>
     </div>
   )

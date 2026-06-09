@@ -22,7 +22,7 @@ export function Select({ label, placeholder, error, options, className = '', ...
         {...props}
       >
         {placeholder && (
-          <option value="" disabled className="text-muted bg-surface">
+          <option value="" className="text-muted bg-surface">
             {placeholder}
           </option>
         )}

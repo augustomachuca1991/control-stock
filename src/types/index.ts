@@ -16,6 +16,8 @@ export interface Product {
   minStock: number
   description: string
   images?: string[]
+  enabled: boolean
+  userId?: string
   createdAt: number
   updatedAt: number
 }
@@ -33,12 +35,20 @@ export interface Sale {
   total: number
   paymentMethod: PaymentMethod
   status: SaleStatus
+  userId?: string
   createdAt: number
 }
 
 export type PaymentMethod = 'cash' | 'card' | 'transfer'
 
 export type SaleStatus = 'active' | 'voided'
+
+export interface Profile {
+  id: string
+  full_name: string
+  phone: string
+  avatar_url: string
+}
 
 export interface PurchaseItem {
   productId: string
@@ -53,5 +63,7 @@ export interface Purchase {
   items: PurchaseItem[]
   total: number
   date: string
+  userId?: string
+  userEmail?: string
   createdAt: number
 }

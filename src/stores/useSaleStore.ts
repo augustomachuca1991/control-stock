@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import type { Sale, SaleItem, PaymentMethod } from '../types'
-import { sales as initialSales } from '../data/mockData'
 
 interface CreateSalePayload {
   items: SaleItem[]
@@ -18,7 +17,7 @@ interface SaleState {
 }
 
 export const useSaleStore = create<SaleState>((set, get) => ({
-  sales: initialSales,
+  sales: [],
   createSale: (payload) => {
     if (payload.items.length === 0) return null
     const total = payload.items.reduce(

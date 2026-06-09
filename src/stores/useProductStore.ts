@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import type { Product } from '../types'
-import { products as initialProducts } from '../data/mockData'
 
 interface ProductState {
   products: Product[]
@@ -15,7 +14,7 @@ interface ProductState {
 }
 
 export const useProductStore = create<ProductState>((set, get) => ({
-  products: initialProducts,
+  products: [],
   addProduct: (product) =>
     set((state) => ({
       products: [
@@ -23,6 +22,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
         {
           ...product,
           id: `prod-${Date.now()}`,
+          enabled: true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         },

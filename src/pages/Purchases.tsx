@@ -10,6 +10,8 @@ import { Modal } from '../components/ui/Modal'
 import { useProductStore } from '../stores/useProductStore'
 import { useCategoryStore } from '../stores/useCategoryStore'
 import { usePurchaseStore } from '../stores/usePurchaseStore'
+import { useProducts } from '../hooks/useProducts'
+import { usePurchases } from '../hooks/usePurchases'
 import type { PurchaseItem as PurchaseItemType } from '../types'
 import { config } from '../config'
 
@@ -46,20 +48,20 @@ export function Purchases() {
   const [newDescription, setNewDescription] = useState('')
 
   const products = useProductStore((s) => s.products)
-  const addProduct = useProductStore((s) => s.addProduct)
-  const increaseStock = useProductStore((s) => s.increaseStock)
-  const updateProduct = useProductStore((s) => s.updateProduct)
   const categories = useCategoryStore((s) => s.categories)
   const purchases = usePurchaseStore((s) => s.purchases)
-  const addPurchase = usePurchaseStore((s) => s.addPurchase)
+  const { add: addProduct, increaseStock, update: updateProduct } = useProducts()
+  const { add: addPurchase } = usePurchases()
 
   const catOptions = categories.map((c) => ({ value: c.id, label: c.name }))
 
   const productOptions = useMemo(() =>
-    products.map((p) => ({
-      value: p.id,
-      label: `${p.name} — ${p.barcode} · $${p.cost.toFixed(2)} · stock: ${p.stock}`,
-    })),
+    products
+      .filter((p) => p.enabled !== false)
+      .map((p) => ({
+        value: p.id,
+        label: `${p.name} — ${p.barcode} · $${p.cost.toFixed(2)} · stock: ${p.stock}`,
+      })),
     [products]
   )
 
@@ -133,12 +135,12 @@ export function Purchases() {
     setEntries((prev) => prev.filter((e) => e.tempId !== tempId))
   }, [])
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     const purchaseItems: PurchaseItemType[] = []
 
     for (const entry of entries) {
       if (entry.isNew) {
-        addProduct({
+        await addProduct({
           name: entry.productName,
           brand: entry.brand || 'Genérico',
           barcode: entry.barcode || `manual-${Date.now()}-${entry.tempId.slice(0, 6)}`,
@@ -148,10 +150,11 @@ export function Purchases() {
           stock: entry.quantity,
           minStock: 5,
           description: entry.description,
+          enabled: true,
         })
       } else if (entry.productId) {
-        increaseStock(entry.productId, entry.quantity)
-        updateProduct(entry.productId, { cost: entry.cost })
+        await increaseStock(entry.productId, entry.quantity)
+        await updateProduct(entry.productId, { cost: entry.cost })
       }
 
       purchaseItems.push({
@@ -165,7 +168,7 @@ export function Purchases() {
 
     if (purchaseItems.length > 0) {
       const total = purchaseItems.reduce((sum, pi) => sum + pi.quantity * pi.cost, 0)
-      addPurchase({ items: purchaseItems, total, date: invoiceDate })
+      await addPurchase({ items: purchaseItems, total, date: invoiceDate })
     }
 
     setEntries([])
@@ -402,6 +405,9 @@ export function Purchases() {
                         {new Date(pch.createdAt).toLocaleDateString('es-ES', { dateStyle: 'long' })}
                         {pch.date && ` · Comp. ${new Date(pch.date).toLocaleDateString('es-ES')}`}
                       </p>
+                      {pch.userEmail && (
+                        <p className="text-[10px] text-muted mt-0.5">Registró: {pch.userEmail}</p>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-[15px] font-bold text-accent">{config.currency.symbol}{pch.total.toFixed(2)}</p>

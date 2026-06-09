@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from 'react'
-import { Plus, Minus, Trash2, Barcode, ChevronRight, FileText, AlertCircle } from 'lucide-react'
+import { Plus, Minus, Trash2, FileText, AlertCircle } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
@@ -10,6 +10,8 @@ import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
 import { useProductStore } from '../stores/useProductStore'
 import { useSaleStore } from '../stores/useSaleStore'
+import { useSales } from '../hooks/useSales'
+import { useProducts } from '../hooks/useProducts'
 import type { Sale, SaleStatus } from '../types'
 import { config } from '../config'
 
@@ -25,7 +27,6 @@ export function Sales() {
   const [modalOpen, setModalOpen] = useState(false)
   const [cart, setCart] = useState<CartItem[]>([])
   const [selectedProductId, setSelectedProductId] = useState('')
-  const [barcodeInput, setBarcodeInput] = useState('')
   const [quantity, setQuantity] = useState('1')
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash')
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -37,31 +38,17 @@ export function Sales() {
 
   const products = useProductStore((s) => s.products)
   const sales = useSaleStore((s) => s.sales)
-  const createSale = useSaleStore((s) => s.createSale)
-  const voidSale = useSaleStore((s) => s.voidSale)
-  const reduceStock = useProductStore((s) => s.reduceStock)
-  const increaseStock = useProductStore((s) => s.increaseStock)
   const getProductById = useProductStore((s) => s.getProductById)
+  const { create: createSale, voidSale } = useSales()
+  const { reduceStock, increaseStock } = useProducts()
 
   const openCreate = useCallback(() => {
     setCart([])
     setSelectedProductId('')
-    setBarcodeInput('')
     setQuantity('1')
     setPaymentMethod('cash')
     setModalOpen(true)
   }, [])
-
-  /*   const handleBarcodeSearch = useCallback((e: React.FormEvent) => {
-      e.preventDefault()
-      if (!barcodeInput) return
-      const found = products.find((p) => p.barcode === barcodeInput && p.stock > 0)
-      if (found) {
-        setSelectedProductId(found.id)
-        setBarcodeInput('')
-        setTimeout(() => quantityRef.current?.focus(), 100)
-      }
-    }, [barcodeInput, products]) */
 
   const addToCart = useCallback(() => {
     if (!selectedProductId) return
@@ -104,8 +91,8 @@ export function Sales() {
     [cart]
   )
 
-  const handleConfirmSale = useCallback(() => {
-    const sale = createSale({
+  const handleConfirmSale = useCallback(async () => {
+    const { data: sale } = await createSale({
       items: cart.map((c) => ({
         productId: c.productId,
         productName: c.productName,
@@ -115,7 +102,7 @@ export function Sales() {
       paymentMethod,
     })
     if (sale) {
-      cart.forEach((c) => reduceStock(c.productId, c.quantity))
+      await Promise.all(cart.map((c) => reduceStock(c.productId, c.quantity)))
       setLastSale(sale)
     }
     setPreviewOpen(false)
@@ -124,17 +111,17 @@ export function Sales() {
     if (sale) setReceiptOpen(true)
   }, [cart, paymentMethod, createSale, reduceStock])
 
-  const handleVoidSale = useCallback(() => {
+  const handleVoidSale = useCallback(async () => {
     if (!saleToVoid) return
-    saleToVoid.items.forEach((item) => increaseStock(item.productId, item.quantity))
-    voidSale(saleToVoid.id)
+    await Promise.all(saleToVoid.items.map((item) => increaseStock(item.productId, item.quantity)))
+    await voidSale(saleToVoid.id)
     setVoidConfirmOpen(false)
     setSaleToVoid(null)
   }, [saleToVoid, increaseStock, voidSale])
 
   const productOptions = useMemo(() =>
     products
-      .filter((p) => p.stock > 0)
+      .filter((p) => p.enabled !== false && p.stock > 0)
       .map((p) => ({
         value: p.id,
         label: `${p.name} — ${config.currency.symbol}${p.price.toFixed(2)} (${p.stock} uds.) · ${p.barcode}`,
