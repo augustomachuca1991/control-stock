@@ -6,6 +6,34 @@ import type { Backup } from '../types'
 
 const BUCKET = 'backups'
 
+async function listBucketRecursive(bucket: string, prefix: string): Promise<unknown[]> {
+  const all: unknown[] = []
+  const { data: entries, error } = await supabase.storage.from(bucket).list(prefix, { limit: 1000 })
+  if (error || !entries) return all
+
+  const files = entries.filter((e) => e.id)
+  for (const f of files) {
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(prefix ? `${prefix}/${f.name}` : f.name)
+    all.push({
+      name: prefix ? `${prefix}/${f.name}` : f.name,
+      size: f.metadata?.size ?? 0,
+      mimetype: f.metadata?.mimetype ?? '',
+      created_at: f.created_at,
+      updated_at: f.updated_at,
+      public_url: urlData.publicUrl,
+    })
+  }
+
+  const folders = entries.filter((e) => !e.id)
+  for (const folder of folders) {
+    const subPrefix = prefix ? `${prefix}/${folder.name}` : folder.name
+    const children = await listBucketRecursive(bucket, subPrefix)
+    all.push(...children)
+  }
+
+  return all
+}
+
 type BackupRow = {
   id: string
   file_name: string
@@ -34,6 +62,8 @@ const mapRow = (row: BackupRow): Backup => ({
 
 const TABLES = ['products', 'categories', 'sales', 'purchases', 'invoices', 'profiles'] as const
 
+const STORAGE_BUCKETS = ['product-images', 'avatars', 'invoice-files', 'backups'] as const
+
 // Orden correcto para respetar FK: categories -> profiles -> products -> sales/purchases/invoices
 const RESTORE_ORDER = ['categories', 'profiles', 'products', 'sales', 'purchases', 'invoices']
 
@@ -59,17 +89,24 @@ export function useBackups() {
 
   useEffect(() => { load() }, [load])
 
-  const create = useCallback(async (selectedTables: string[]) => {
+  const create = useCallback(async (selected: string[]) => {
     setCreating(true)
     const start = Date.now()
 
     try {
-      const tables = selectedTables.length === 0 ? [...TABLES] : selectedTables
+      const allSelected = selected.length === 0 ? [...TABLES, ...STORAGE_BUCKETS] : selected
+      const tableNames = allSelected.filter((t) => !(STORAGE_BUCKETS as readonly string[]).includes(t))
+      const bucketNames = allSelected.filter((t) => (STORAGE_BUCKETS as readonly string[]).includes(t))
       const dump: Record<string, unknown[]> = {}
 
-      for (const table of tables) {
+      for (const table of tableNames) {
         const { data } = await supabase.from(table).select('*')
         dump[table] = data ?? []
+      }
+
+      for (const bucket of bucketNames) {
+        const entries = await listBucketRecursive(bucket, '')
+        dump[`_storage:${bucket}`] = entries
       }
 
       const { data: user } = await supabase.auth.getUser()
@@ -92,7 +129,7 @@ export function useBackups() {
         file_path: filePath,
         size_bytes: bytes,
         duration_ms: duration,
-        tables,
+        tables: allSelected,
         status: 'completed',
         user_email: userEmail,
       })
@@ -199,6 +236,7 @@ export function useBackups() {
     loading,
     creating,
     TABLES: [...TABLES],
+    STORAGE_BUCKETS: [...STORAGE_BUCKETS],
     create,
     remove,
     downloadBackup,

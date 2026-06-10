@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 type Tab = 'profile' | 'backup'
 
 export function Settings() {
-  const { backups, loading: backupsLoading, creating, TABLES, create: createBackup, remove, downloadBackup, restore } = useBackups()
+  const { backups, loading: backupsLoading, creating, TABLES, STORAGE_BUCKETS, create: createBackup, remove, downloadBackup, restore } = useBackups()
 
   const [activeTab, setActiveTab] = useState<Tab>('backup')
   const [selectedTables, setSelectedTables] = useState<string[]>([])
@@ -120,7 +120,7 @@ export function Settings() {
           </Card>
 
           {/* Categoría de Respaldo */}
-          <Card title="Categoría de Respaldo" subtitle="Seleccioná las tablas a incluir">
+          <Card title="Categoría de Respaldo" subtitle="Seleccioná las tablas y archivos a incluir">
             <div className="space-y-2">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -142,6 +142,21 @@ export function Settings() {
                       className="h-4 w-4 accent-primary"
                     />
                     <span className="text-[12px] text-muted-light capitalize">{t}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted mt-3">Archivos (Storage)</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {STORAGE_BUCKETS.map((b) => (
+                  <label key={b} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectAll || selectedTables.includes(b)}
+                      onChange={() => toggleTable(b)}
+                      disabled={selectAll}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <span className="text-[12px] text-muted-light">{b}</span>
                   </label>
                 ))}
               </div>
