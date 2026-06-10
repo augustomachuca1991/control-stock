@@ -17,6 +17,7 @@ export function Settings() {
   const [restoreModalOpen, setRestoreModalOpen] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [selectedRestoreFile, setSelectedRestoreFile] = useState<File | null>(null)
   const restoreInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -30,16 +31,28 @@ export function Settings() {
     if (selectAll) setSelectAll(false)
   }
 
-  const handleRestoreFile = useCallback(async (file: File) => {
+  const handleSelectRestoreFile = useCallback((file: File | null) => {
+    if (!file) return
     if (!file.name.endsWith('.json')) {
       toast.error('Solo se permiten archivos .json')
       return
     }
+    setSelectedRestoreFile(file)
+  }, [])
+
+  const handleConfirmRestore = useCallback(async () => {
+    if (!selectedRestoreFile) return
     setRestoring(true)
-    await restore(file)
+    await restore(selectedRestoreFile)
     setRestoring(false)
+    setSelectedRestoreFile(null)
     setRestoreModalOpen(false)
-  }, [restore])
+  }, [selectedRestoreFile, restore])
+
+  const handleCancelRestore = useCallback(() => {
+    setSelectedRestoreFile(null)
+    setRestoreModalOpen(false)
+  }, [])
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
@@ -210,32 +223,85 @@ export function Settings() {
       )}
 
       {/* Modal Restaurar */}
-      <Modal open={restoreModalOpen} onClose={() => setRestoreModalOpen(false)} title="Restaurar desde archivo" size="sm">
-        <div className="space-y-4">
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleRestoreFile(f) }}
-            className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors ${dragOver ? 'border-primary bg-primary-dim' : 'border-border hover:border-border-strong'
-              }`}
-            onClick={() => restoreInputRef.current?.click()}
-          >
-            <FileText size={32} className="text-muted" />
-            <p className="mt-2 text-[13px] font-medium text-text">Seleccioná un archivo .json</p>
-            <p className="text-[11px] text-muted">o arrastralo aquí</p>
-            <input
-              ref={restoreInputRef}
-              type="file"
-              accept=".json"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRestoreFile(f) }}
-            />
+      <Modal open={restoreModalOpen} onClose={() => { if (!restoring) { setSelectedRestoreFile(null); setRestoreModalOpen(false) } }} size="sm">
+        <div className="space-y-5">
+          {/* Header */}
+          <div className="border-b border-border pb-3">
+            <h2 className="text-[18px] font-bold text-text tracking-tight">Restaurar desde backup</h2>
+            <p className="mt-1 text-[12px] text-muted">
+              Esta acción sobreescribirá los datos existentes con los del archivo seleccionado.
+            </p>
           </div>
-          <div className="flex justify-end gap-3">
-            <Button variant="gold-outline" onClick={() => setRestoreModalOpen(false)} disabled={restoring}>
-              Cancelar
-            </Button>
+
+          {/* Banner de riesgo */}
+          <div className="flex items-start gap-3 rounded-lg border border-danger-dim bg-danger-dim/20 p-3">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-danger-text" />
+            <div className="text-[12px] leading-relaxed text-muted">
+              <p className="font-semibold text-danger-text">Atención</p>
+              <p className="mt-0.5">
+                Los registros existentes serán sobreescritos con los datos del backup. Esta acción{' '}
+                <span className="font-semibold text-danger-text">no se puede deshacer</span>.
+              </p>
+            </div>
           </div>
+
+          {!selectedRestoreFile ? (
+            /* File selector */
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); handleSelectRestoreFile(e.dataTransfer.files[0] ?? null) }}
+              className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed py-10 px-6 transition-colors ${dragOver ? 'border-primary bg-primary-dim' : 'border-border hover:border-border-strong'}`}
+              onClick={() => restoreInputRef.current?.click()}
+            >
+              <FileText size={36} className="text-muted-light" />
+              <p className="mt-3 text-[14px] font-medium text-text">Seleccioná un archivo <span className="font-mono text-primary-light">.json</span></p>
+              <p className="mt-1 text-[11px] text-muted">o arrastralo aquí</p>
+              <input
+                ref={restoreInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={(e) => handleSelectRestoreFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+          ) : (
+            /* File selected — review before restoring */
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border bg-surface p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-dim">
+                    <FileText size={20} className="text-primary-light" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-medium text-text truncate">{selectedRestoreFile.name}</p>
+                    <p className="text-[11px] text-muted">{formatSize(selectedRestoreFile.size)}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRestoreFile(null)}
+                  className="text-[11px] text-muted underline transition-colors hover:text-muted-light"
+                >
+                  Elegir otro archivo
+                </button>
+                <div className="flex gap-2">
+                  <Button variant="surface" onClick={handleCancelRestore} disabled={restoring}>
+                    Cancelar
+                  </Button>
+                  <Button variant="gold" onClick={handleConfirmRestore} disabled={restoring}>
+                    {restoring ? (
+                      <><Loader2 size={14} className="animate-spin" /> Restaurando...</>
+                    ) : (
+                      <><Upload size={14} /> Restaurar</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
     </div>
