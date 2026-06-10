@@ -1,7 +1,7 @@
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Formik, Form } from 'formik'
 import type { FormikProps } from 'formik'
-import { Plus, Minus, Trash2, FileText, AlertCircle } from 'lucide-react'
+import { Plus, Minus, Trash2, FileText, AlertCircle, ShoppingCart } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -17,19 +17,11 @@ import { useSales } from '../hooks/useSales'
 import { useProducts } from '../hooks/useProducts'
 import { saleSchema } from '../lib/validation'
 import type { Sale, SaleStatus, PaymentMethod } from '../types'
+import type { CartItem } from '../stores/useSaleStore'
 import { config } from '../config'
-
-interface CartItem {
-  productId: string
-  productName: string
-  quantity: number
-  unitPrice: number
-  maxStock: number
-}
 
 export function Sales() {
   const [modalOpen, setModalOpen] = useState(false)
-  const [cart, setCart] = useState<CartItem[]>([])
   const [selectedProductId, setSelectedProductId] = useState('')
   const [quantity, setQuantity] = useState('1')
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -44,12 +36,21 @@ export function Sales() {
 
   const products = useProductStore((s) => s.products)
   const sales = useSaleStore((s) => s.sales)
+  const cart = useSaleStore((s) => s.cart)
+  const addToCartStore = useSaleStore((s) => s.addToCart)
+  const updateCartItem = useSaleStore((s) => s.updateCartItem)
+  const removeFromCart = useSaleStore((s) => s.removeFromCart)
+  const clearCart = useSaleStore((s) => s.clearCart)
   const getProductById = useProductStore((s) => s.getProductById)
   const { create: createSale, voidSale } = useSales()
   const { reduceStock, increaseStock } = useProducts()
 
+  // Auto-abrir el modal si hay items en el carrito al volver a la página
+  useEffect(() => {
+    if (cart.length > 0) setModalOpen(true)
+  }, [cart.length])
+
   const openCreate = useCallback(() => {
-    setCart([])
     setSelectedProductId('')
     setQuantity('1')
     setModalOpen(true)
@@ -65,42 +66,29 @@ export function Sales() {
       return
     }
 
-    setCart((prev) => {
-      const existing = prev.find((c) => c.productId === selectedProductId)
-      const currentCartQty = existing ? existing.quantity : 0
-      const available = product.stock - currentCartQty
-      if (available <= 0) {
-        toast.error(`Stock insuficiente de ${product.name} (quedan ${product.stock} uds. y ya agregaste ${currentCartQty})`)
-        return prev
-      }
-      const qty = Math.min(q, available)
-      if (existing) {
-        return prev.map((c) =>
-          c.productId === selectedProductId
-            ? { ...c, quantity: c.quantity + qty, maxStock: product.stock }
-            : c
-        )
-      }
-      return [...prev, { productId: product.id, productName: product.name, quantity: qty, unitPrice: product.price, maxStock: product.stock }]
-    })
+    const existing = cart.find((c) => c.productId === selectedProductId)
+    const currentCartQty = existing ? existing.quantity : 0
+    const available = product.stock - currentCartQty
+    if (available <= 0) {
+      toast.error(`Stock insuficiente de ${product.name} (quedan ${product.stock} uds. y ya agregaste ${currentCartQty})`)
+      return
+    }
+    const qty = Math.min(q, available)
+    const newItem: CartItem = {
+      productId: product.id,
+      productName: product.name,
+      quantity: existing ? existing.quantity + qty : qty,
+      unitPrice: product.price,
+      maxStock: product.stock,
+    }
+    addToCartStore(newItem)
     setSelectedProductId('')
     setQuantity('1')
-  }, [selectedProductId, quantity, getProductById])
+  }, [selectedProductId, quantity, getProductById, cart, addToCartStore])
 
   const updateCartQty = useCallback((productId: string, delta: number) => {
-    setCart((prev) =>
-      prev.map((c) => {
-        if (c.productId !== productId) return c
-        const next = c.quantity + delta
-        if (next <= 0) return c
-        return { ...c, quantity: Math.min(next, c.maxStock) }
-      }).filter((c) => c.quantity > 0)
-    )
-  }, [])
-
-  const removeFromCart = useCallback((productId: string) => {
-    setCart((prev) => prev.filter((c) => c.productId !== productId))
-  }, [])
+    updateCartItem(productId, delta)
+  }, [updateCartItem])
 
   const cartTotal = useMemo(() =>
     cart.reduce((sum, c) => sum + c.quantity * c.unitPrice, 0),
@@ -145,9 +133,9 @@ export function Sales() {
     setConfirming(false)
     setPreviewOpen(false)
     setModalOpen(false)
-    setCart([])
+    clearCart()
     if (sale) setReceiptOpen(true)
-  }, [cart, createSale, reduceStock, getProductById])
+  }, [cart, createSale, reduceStock, getProductById, clearCart])
 
   const [voiding, setVoiding] = useState(false)
 
@@ -201,10 +189,33 @@ export function Sales() {
 
   return (
     <>
+      {/* Barra de carrito activo (solo cuando hay items y el modal está cerrado) */}
+      {cart.length > 0 && !modalOpen && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-accent/40 bg-accent-dim/20 px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <ShoppingCart size={16} className="text-accent" />
+            <span className="text-[12px] text-text">
+              <span className="font-semibold">{cart.length} producto{cart.length !== 1 ? 's' : ''}</span> en el carrito
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={clearCart}
+              className="text-[11px] text-muted underline transition-colors hover:text-danger-text"
+            >
+              Vaciar carrito
+            </button>
+            <Button variant="gold" size="sm" onClick={() => setModalOpen(true)}>
+              <ShoppingCart size={14} /> Ir al carrito
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Card
         title="Ventas"
         subtitle={`${sales.length} venta${sales.length !== 1 ? 's' : ''} registradas`}
-        actions={<Button variant="gold" size="sm" onClick={openCreate}><Plus size={16} /> Nueva Venta</Button>}
+        actions={cart.length === 0 && <Button variant="gold" size="sm" onClick={openCreate}><Plus size={16} /> Nueva Venta</Button>}
       >
         <Table
           columns={saleColumns}
@@ -260,7 +271,7 @@ export function Sales() {
             <Form>
               <div className="space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
                     <SearchSelect
                       label="Producto"
                       options={productOptions}
@@ -269,10 +280,10 @@ export function Sales() {
                       placeholder="Buscar por nombre o código de barras..."
                     />
                   </div>
-                  <div className="w-full sm:w-24">
+                  <div className="w-full shrink-0 sm:w-24">
                     <Input ref={quantityRef} label="Cant." type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
                   </div>
-                  <div className="sm:mb-[23px]">
+                  <div className="shrink-0 sm:mb-[23px]">
                     <Button onClick={addToCart} disabled={!selectedProductId}><Plus size={16} /> Agregar</Button>
                   </div>
                 </div>

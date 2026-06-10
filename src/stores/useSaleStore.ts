@@ -1,6 +1,14 @@
 import { create } from 'zustand'
 import type { Sale, SaleItem, PaymentMethod } from '../types'
 
+export interface CartItem {
+  productId: string
+  productName: string
+  quantity: number
+  unitPrice: number
+  maxStock: number
+}
+
 interface CreateSalePayload {
   items: SaleItem[]
   paymentMethod: PaymentMethod
@@ -8,6 +16,11 @@ interface CreateSalePayload {
 
 interface SaleState {
   sales: Sale[]
+  cart: CartItem[]
+  addToCart: (item: CartItem) => void
+  updateCartItem: (productId: string, delta: number) => void
+  removeFromCart: (productId: string) => void
+  clearCart: () => void
   createSale: (payload: CreateSalePayload) => Sale | null
   voidSale: (id: string) => void
   getRecentSales: (limit?: number) => Sale[]
@@ -18,6 +31,35 @@ interface SaleState {
 
 export const useSaleStore = create<SaleState>((set, get) => ({
   sales: [],
+  cart: [],
+  addToCart: (item) =>
+    set((state) => {
+      const existing = state.cart.find((c) => c.productId === item.productId)
+      if (existing) {
+        return {
+          cart: state.cart.map((c) =>
+            c.productId === item.productId ? item : c
+          ),
+        }
+      }
+      return { cart: [...state.cart, item] }
+    }),
+  updateCartItem: (productId, delta) =>
+    set((state) => ({
+      cart: state.cart
+        .map((c) => {
+          if (c.productId !== productId) return c
+          const next = c.quantity + delta
+          if (next <= 0) return null
+          return { ...c, quantity: Math.min(next, c.maxStock) }
+        })
+        .filter(Boolean) as CartItem[],
+    })),
+  removeFromCart: (productId) =>
+    set((state) => ({
+      cart: state.cart.filter((c) => c.productId !== productId),
+    })),
+  clearCart: () => set({ cart: [] }),
   createSale: (payload) => {
     if (payload.items.length === 0) return null
     const total = payload.items.reduce(

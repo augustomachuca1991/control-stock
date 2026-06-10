@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Formik, Form } from 'formik'
-import { Menu, LogOut, Sun, Moon, Upload, UserCog, Database } from 'lucide-react'
+import { Menu, LogOut, Sun, Moon, Upload, ShoppingCart, UserCog, Database } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProfile } from '../../hooks/useProfile'
 import { useThemeStore } from '../../stores/useThemeStore'
+import { useSaleStore } from '../../stores/useSaleStore'
 import { Modal } from '../ui/Modal'
 import { Img } from '../ui/Img'
 import { Input } from '../ui/Input'
@@ -94,6 +95,8 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           >
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
+
+          <CartBadge />
 
           <div className="relative" ref={dropdownRef}>
             <button
@@ -211,5 +214,25 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         </Formik>
       </Modal>
     </>
+  )
+}
+
+function CartBadge() {
+  const cart = useSaleStore((s) => s.cart)
+  const navigate = useNavigate()
+  const count = cart.length
+  if (count === 0) return null
+
+  return (
+    <button
+      onClick={() => navigate('/sales')}
+      className="relative rounded-lg p-1.5 text-muted transition-colors hover:bg-primary-dim hover:text-primary-light"
+      title="Ir al carrito de ventas"
+    >
+      <ShoppingCart size={18} />
+      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-white">
+        {count}
+      </span>
+    </button>
   )
 }

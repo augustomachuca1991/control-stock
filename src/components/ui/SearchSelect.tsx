@@ -62,7 +62,7 @@ export function SearchSelect({ options, value, onChange, placeholder = 'Buscar..
                 onClick={() => setOpen((v) => !v)}
                 className={`flex h-9 w-full items-center justify-between rounded-lg border bg-surface px-3 text-[13px] transition-colors focus:outline-none focus:border-border-strong ${error ? 'border-danger/50' : 'border-border'}`}
             >
-                <span className={`truncate ${selected ? 'text-text' : 'text-muted'}`}>
+                <span className={`min-w-0 flex-1 truncate ${selected ? 'text-text' : 'text-muted'}`}>
                     {selected ? selected.label : placeholder}
                 </span>
                 <div className="flex shrink-0 items-center gap-1 ml-2">
