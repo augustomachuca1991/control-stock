@@ -31,5 +31,9 @@ dist-ssr
 # Supabase CLI temp files
 supabase/.temp/
 
+# Backup data files
+backups/
+arbol_directorios.txt
+
 # Vite PWA dev output
 dev-dist

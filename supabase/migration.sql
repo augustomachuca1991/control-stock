@@ -223,3 +223,45 @@ create policy "auth_invoice_files_delete"
   on storage.objects for delete using (
     bucket_id = 'invoice-files' and auth.role() = 'authenticated'
   );
+
+-- 10. TABLA BACKUPS ------------------------------------------------
+
+create table backups (
+  id         uuid primary key default gen_random_uuid(),
+  file_name  text not null default '',
+  file_path  text not null default '',
+  size_bytes integer not null default 0,
+  duration_ms integer not null default 0,
+  tables     text[] not null default '{}',
+  status     text not null default 'completed',
+  user_id    uuid not null default auth.uid() references auth.users(id),
+  user_email text not null default '',
+  created_at timestamptz not null default now()
+);
+
+alter table backups enable row level security;
+
+create policy "auth_backups_select" on backups for select using (auth.role() = 'authenticated');
+create policy "auth_backups_insert" on backups for insert with check (auth.role() = 'authenticated');
+create policy "auth_backups_delete" on backups for delete using (auth.role() = 'authenticated');
+
+-- 11. STORAGE: bucket para backups --------------------------------
+
+insert into storage.buckets (id, name, public)
+values ('backups', 'backups', true)
+on conflict (id) do nothing;
+
+create policy "auth_backups_files_select"
+  on storage.objects for select using (
+    bucket_id = 'backups' and auth.role() = 'authenticated'
+  );
+
+create policy "auth_backups_files_insert"
+  on storage.objects for insert with check (
+    bucket_id = 'backups' and auth.role() = 'authenticated'
+  );
+
+create policy "auth_backups_files_delete"
+  on storage.objects for delete using (
+    bucket_id = 'backups' and auth.role() = 'authenticated'
+  );

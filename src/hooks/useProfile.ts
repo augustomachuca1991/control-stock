@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { toast } from 'sonner'
 import type { Profile } from '../types'
 
 const AVATAR_BUCKET = 'avatars'
@@ -23,7 +24,10 @@ export function useProfile(userId: string | undefined) {
       { id: userId, ...input },
       { onConflict: 'id' }
     )
-    if (err) return { error: err.message }
+    if (err) {
+      toast.error(err.message)
+      return { error: err.message }
+    }
     setProfile((prev) => prev ? { ...prev, ...input } : null)
     return {}
   }, [userId])

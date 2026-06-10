@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Formik, Form } from 'formik'
-import { Menu, LogOut, Settings, Sun, Moon, Upload } from 'lucide-react'
+import { Menu, LogOut, Sun, Moon, Upload, UserCog, Database } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProfile } from '../../hooks/useProfile'
@@ -20,7 +20,8 @@ const titles: Record<string, string> = {
   '/sales': 'Ventas',
   '/purchases': 'Compras',
   '/categories': 'Categorías',
-  '/invoices':   'Factura',
+  '/invoices': 'Factura',
+  '/settings': 'Ajustes',
 }
 
 interface HeaderProps {
@@ -95,51 +96,58 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </button>
 
           <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setDropdownOpen((v) => !v)}
-            className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-primary-dim"
-          >
-            {profile?.avatar_url ? (
-              <Img src={profile.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover" skeleton="rounded-full" />
-            ) : (
-              <span
-                className="flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-bold"
-                style={{
-                  background: theme === 'light' ? '#1c1917' : '#C9A84C',
-                  color: theme === 'light' ? '#faf6f0' : '#0D0D0A',
-                }}
-              >
-                {initial}
+            <button
+              onClick={() => setDropdownOpen((v) => !v)}
+              className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-primary-dim"
+            >
+              {profile?.avatar_url ? (
+                <Img src={profile.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover" skeleton="rounded-full" />
+              ) : (
+                <span
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-bold"
+                  style={{
+                    background: theme === 'light' ? '#1c1917' : '#C9A84C',
+                    color: theme === 'light' ? '#faf6f0' : '#0D0D0A',
+                  }}
+                >
+                  {initial}
+                </span>
+              )}
+              <span className="hidden text-[12px] font-medium uppercase text-text sm:block">
+                {profile?.full_name || user?.email}
               </span>
-            )}
-            <span className="hidden text-[12px] font-medium uppercase text-text sm:block">
-              {profile?.full_name || user?.email}
-            </span>
-          </button>
+            </button>
 
-          {dropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-64 rounded-lg border border-border-strong bg-bg p-3 shadow-2xl">
-              <div className="mb-3 border-b border-border pb-3">
-                <p className="text-[13px] font-semibold uppercase text-text">{profile?.full_name || 'Usuario'}</p>
-                <p className="text-[11px] text-muted">{user?.email}</p>
-                {profile?.phone && <p className="text-[11px] text-muted">{profile.phone}</p>}
+            {dropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-64 rounded-lg border border-border-strong bg-bg p-3 shadow-2xl">
+                <div className="mb-3 border-b border-border pb-3">
+                  <p className="text-[13px] font-semibold uppercase text-text">{profile?.full_name || 'Usuario'}</p>
+                  <p className="text-[11px] text-muted">{user?.email}</p>
+                  {profile?.phone && <p className="text-[11px] text-muted">{profile.phone}</p>}
+                </div>
+
+                <button
+                  onClick={() => { setDropdownOpen(false); setProfileModalOpen(true) }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-muted transition-colors hover:bg-surface hover:text-text"
+                >
+                  <UserCog size={14} /> Editar perfil
+                </button>
+
+                <button
+                  onClick={() => { setDropdownOpen(false); navigate('/settings') }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-muted transition-colors hover:bg-surface hover:text-text"
+                >
+                  <Database size={14} /> Respaldo y Restauración
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-danger-text transition-colors hover:bg-danger-dim"
+                >
+                  <LogOut size={14} /> Cerrar sesión
+                </button>
               </div>
-
-              <button
-                onClick={() => { setDropdownOpen(false); setProfileModalOpen(true) }}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-muted transition-colors hover:bg-surface hover:text-text"
-              >
-                <Settings size={14} /> Editar perfil
-              </button>
-
-              <button
-                onClick={handleLogout}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-danger-text transition-colors hover:bg-danger-dim"
-              >
-                <LogOut size={14} /> Cerrar sesión
-              </button>
-            </div>
-          )}
+            )}
           </div>
         </div>
       </header>

@@ -93,3 +93,16 @@ export interface Purchase {
   userEmail?: string
   createdAt: number
 }
+
+export interface Backup {
+  id: string
+  fileName: string
+  filePath: string
+  sizeBytes: number
+  durationMs: number
+  tables: string[]
+  status: 'completed' | 'failed'
+  userId?: string
+  userEmail?: string
+  createdAt: number
+}

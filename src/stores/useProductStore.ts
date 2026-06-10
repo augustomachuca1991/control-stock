@@ -47,7 +47,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     set((state) => ({
       products: state.products.map((p) =>
         p.id === id
-          ? { ...p, stock: p.stock - quantity, enabled: disable ? false : p.enabled, updatedAt: Date.now() }
+          ? { ...p, stock: Math.max(0, p.stock - quantity), enabled: disable ? false : p.enabled, updatedAt: Date.now() }
           : p
       ),
     })),

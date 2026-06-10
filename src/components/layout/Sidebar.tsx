@@ -4,12 +4,13 @@ import { LayoutDashboard, Package, ShoppingCart, Tags, ClipboardList, FileText }
 import MarelyLogo from '../ui/MarelyLogo'
 
 const links = [
-  { to: '/',          label: 'Dashboard',  icon: LayoutDashboard },
-  { to: '/products',  label: 'Productos',  icon: Package },
-  { to: '/sales',     label: 'Ventas',     icon: ShoppingCart },
-  { to: '/purchases', label: 'Compras',    icon: ClipboardList },
-  { to: '/categories',label: 'Categorías', icon: Tags },
-  { to: '/invoices',  label: 'Factura',    icon: FileText },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/products', label: 'Productos', icon: Package },
+  { to: '/sales', label: 'Ventas', icon: ShoppingCart },
+  { to: '/purchases', label: 'Compras', icon: ClipboardList },
+  { to: '/categories', label: 'Categorías', icon: Tags },
+  { to: '/invoices', label: 'Factura', icon: FileText },
+  /* { to: '/settings',  label: 'Ajustes',    icon: Settings }, */
 ]
 
 interface SidebarProps {
@@ -29,17 +30,15 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     <>
       {/* Overlay mobile */}
       <div
-        className={`fixed inset-0 z-30 bg-black/60 backdrop-blur-sm transition-opacity duration-700 ease-out will-change-opacity md:hidden ${
-          open ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
+        className={`fixed inset-0 z-30 bg-black/60 backdrop-blur-sm transition-opacity duration-700 ease-out will-change-opacity md:hidden ${open ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
         onClick={onClose}
       />
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-border bg-surface transition-all duration-700 ease-out will-change-transform md:static md:z-auto md:translate-x-0 md:opacity-100 ${
-          open ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
-        }`}
+        className={`fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-border bg-surface transition-all duration-700 ease-out will-change-transform md:static md:z-auto md:translate-x-0 md:opacity-100 ${open ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
+          }`}
       >
         {/* Logo */}
         <div className="border-b border-border flex justify-center px-4 py-2">
@@ -55,10 +54,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               end={link.to === '/'}
               onClick={onClose}
               className={({ isActive }) =>
-                `flex items-center gap-[10px] rounded-lg px-3 py-[9px] text-[13px] transition-colors ${
-                  isActive
-                    ? 'border border-border-strong bg-primary-dim text-primary-light'
-                    : 'text-muted hover:bg-primary-dim/50 hover:text-muted-light'
+                `flex items-center gap-[10px] rounded-lg px-3 py-[9px] text-[13px] transition-colors ${isActive
+                  ? 'border border-border-strong bg-primary-dim text-primary-light'
+                  : 'text-muted hover:bg-primary-dim/50 hover:text-muted-light'
                 }`
               }
             >

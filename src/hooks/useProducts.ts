@@ -139,7 +139,13 @@ export function useProducts() {
       return { error: 'Product not found' }
     }
 
-    const newStock = product.stock - quantity
+    if (product.stock < quantity) {
+      const msg = `Stock insuficiente: disponible ${product.stock}, requerido ${quantity}`
+      toast.error(msg)
+      return { error: msg }
+    }
+
+    const newStock = Math.max(0, product.stock - quantity)
     const payload: Record<string, unknown> = { stock: newStock }
     if (newStock <= 0) payload.enabled = false
 

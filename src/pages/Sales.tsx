@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef } from 'react'
 import { Formik, Form } from 'formik'
 import type { FormikProps } from 'formik'
 import { Plus, Minus, Trash2, FileText, AlertCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
@@ -59,17 +60,28 @@ export function Sales() {
     const q = parseInt(quantity, 10) || 1
     const product = getProductById(selectedProductId)
     if (!product || q <= 0) return
+    if (product.stock <= 0) {
+      toast.error(`${product.name} no tiene stock disponible`)
+      return
+    }
 
     setCart((prev) => {
       const existing = prev.find((c) => c.productId === selectedProductId)
+      const currentCartQty = existing ? existing.quantity : 0
+      const available = product.stock - currentCartQty
+      if (available <= 0) {
+        toast.error(`Stock insuficiente de ${product.name} (quedan ${product.stock} uds. y ya agregaste ${currentCartQty})`)
+        return prev
+      }
+      const qty = Math.min(q, available)
       if (existing) {
         return prev.map((c) =>
           c.productId === selectedProductId
-            ? { ...c, quantity: Math.min(c.quantity + q, c.maxStock) }
+            ? { ...c, quantity: c.quantity + qty, maxStock: product.stock }
             : c
         )
       }
-      return [...prev, { productId: product.id, productName: product.name, quantity: Math.min(q, product.stock), unitPrice: product.price, maxStock: product.stock }]
+      return [...prev, { productId: product.id, productName: product.name, quantity: qty, unitPrice: product.price, maxStock: product.stock }]
     })
     setSelectedProductId('')
     setQuantity('1')
@@ -98,6 +110,21 @@ export function Sales() {
   const handleConfirmSale = useCallback(async () => {
     setConfirming(true)
     const paymentMethod = saleFormikRef.current?.values.paymentMethod ?? 'cash'
+
+    for (const item of cart) {
+      const product = getProductById(item.productId)
+      if (!product) {
+        toast.error(`Producto "${item.productName}" no encontrado`)
+        setConfirming(false)
+        return
+      }
+      if (product.stock < item.quantity) {
+        toast.error(`Stock insuficiente para "${item.productName}": disponible ${product.stock}, requerido ${item.quantity}`)
+        setConfirming(false)
+        return
+      }
+    }
+
     const { data: sale } = await createSale({
       items: cart.map((c) => ({
         productId: c.productId,
@@ -108,7 +135,11 @@ export function Sales() {
       paymentMethod,
     })
     if (sale) {
-      await Promise.all(cart.map((c) => reduceStock(c.productId, c.quantity)))
+      const results = await Promise.allSettled(cart.map((c) => reduceStock(c.productId, c.quantity)))
+      const failures = results.filter((r) => r.status === 'rejected')
+      if (failures.length > 0) {
+        toast.error(`Error al actualizar stock de ${failures.length} producto(s)`)
+      }
       setLastSale(sale)
     }
     setConfirming(false)
@@ -116,7 +147,7 @@ export function Sales() {
     setModalOpen(false)
     setCart([])
     if (sale) setReceiptOpen(true)
-  }, [cart, createSale, reduceStock])
+  }, [cart, createSale, reduceStock, getProductById])
 
   const [voiding, setVoiding] = useState(false)
 
