@@ -376,13 +376,10 @@ export function Sales() {
           style={{ borderColor: 'var(--clr-border)' }}
         >
           <div>
-            <h2
-              className="text-[17px] font-semibold leading-tight"
-              style={{ fontFamily: '"Playfair Display", serif', color: 'var(--clr-text)' }}
-            >
+            <h2 className="text-[10px] font-semibold uppercase tracking-[0.8px] text-muted">
               Ventas
             </h2>
-            <p className="text-[12px] mt-0.5" style={{ color: 'var(--clr-muted)' }}>
+            <p className="mt-0.5 text-[11px] text-muted">
               {sales.length} venta{sales.length !== 1 ? 's' : ''} registradas
             </p>
           </div>
@@ -936,8 +933,8 @@ export function Sales() {
         )}
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="surface" onClick={() => { setDetailModalOpen(false); setDetailSale(null) }}>Cerrar</Button>
-          <Button variant="gold-outline" size="sm" onClick={exportToCSV}>CSV</Button>
-          <Button variant="gold" size="sm" onClick={exportToPDF}>PDF</Button>
+          <Button variant="gold-outline" size="sm" onClick={exportToCSV}>ExportarCSV</Button>
+          <Button variant="gold" size="sm" onClick={exportToPDF}>Exportar PDF</Button>
         </div>
       </Modal>
 
