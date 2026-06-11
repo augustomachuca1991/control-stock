@@ -9,8 +9,10 @@ import { Field } from '../components/ui/Field'
 import { useCategoryStore } from '../stores/useCategoryStore'
 import { useCategories } from '../hooks/useCategories'
 import { categorySchema } from '../lib/validation'
+import { useAuth } from '../contexts/AuthContext'
 
 export function Categories() {
+  const { isAdmin } = useAuth()
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null)
@@ -59,9 +61,11 @@ export function Categories() {
                     <Button variant="surface" size="sm" onClick={() => openEdit(cat.id)}>
                       <Pencil size={13} />
                     </Button>
-                    <Button variant="surface" size="sm" onClick={() => setDeleteConfirm({ id: cat.id, name: cat.name })}>
-                      <Trash2 size={13} className="text-danger-text" />
-                    </Button>
+                    {isAdmin && (
+                      <Button variant="surface" size="sm" onClick={() => setDeleteConfirm({ id: cat.id, name: cat.name })}>
+                        <Trash2 size={13} className="text-danger-text" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

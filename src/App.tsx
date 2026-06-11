@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Layout } from './components/layout/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { AdminRoute } from './components/AdminRoute'
 import { Dashboard } from './pages/Dashboard'
 import { Products } from './pages/Products'
 import { Sales } from './pages/Sales'
@@ -30,7 +31,7 @@ export default function App() {
             <Route path="categories" element={<Categories />} />
             <Route path="purchases" element={<Purchases />} />
             <Route path="invoices" element={<Invoices />} />
-            <Route path="settings" element={<Settings />} />
+            <Route path="settings" element={<AdminRoute><Settings /></AdminRoute>} />
           </Route>
         </Route>
         <Route path="*" element={<NotFound />} />

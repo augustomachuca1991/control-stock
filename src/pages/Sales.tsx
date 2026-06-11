@@ -20,6 +20,7 @@ import { saleSchema } from '../lib/validation'
 import type { Sale, SaleStatus, PaymentMethod } from '../types'
 import type { CartItem } from '../stores/useSaleStore'
 import { config } from '../config'
+import { useAuth } from '../contexts/AuthContext'
 
 type FilterStatus = 'all' | 'active' | 'voided'
 type FilterPayment = 'all' | PaymentMethod
@@ -60,6 +61,7 @@ function PaymentTag({ method }: { method: PaymentMethod }) {
 }
 
 export function Sales() {
+  const { isAdmin } = useAuth()
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedProductId, setSelectedProductId] = useState('')
   const [quantity, setQuantity] = useState('1')
@@ -597,7 +599,7 @@ export function Sales() {
                       >
                         Detalle
                       </button>
-                      {!isVoided && (
+                      {!isVoided && isAdmin && (
                         <button
                           onClick={() => { setSaleToVoid(sale); setVoidConfirmOpen(true) }}
                           className="text-[11px] transition-opacity hover:opacity-70"

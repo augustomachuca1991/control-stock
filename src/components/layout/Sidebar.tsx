@@ -1,17 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, ShoppingCart, Tags, ClipboardList, FileText } from 'lucide-react'
+import { LayoutDashboard, Package, ShoppingCart, Tags, ClipboardList, FileText, Settings } from 'lucide-react'
 import MarelyLogo from '../ui/MarelyLogo'
-
-const links = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/products', label: 'Productos', icon: Package },
-  { to: '/sales', label: 'Ventas', icon: ShoppingCart },
-  { to: '/purchases', label: 'Compras', icon: ClipboardList },
-  { to: '/categories', label: 'Categorías', icon: Tags },
-  { to: '/invoices', label: 'Factura', icon: FileText },
-  /* { to: '/settings',  label: 'Ajustes',    icon: Settings }, */
-]
+import { useAuth } from '../../contexts/AuthContext'
 
 interface SidebarProps {
   open: boolean
@@ -19,6 +10,17 @@ interface SidebarProps {
 }
 
 export function Sidebar({ open, onClose }: SidebarProps) {
+  const { isAdmin } = useAuth()
+
+  const links = useMemo(() => [
+    { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/products', label: 'Productos', icon: Package },
+    { to: '/sales', label: 'Ventas', icon: ShoppingCart },
+    { to: '/purchases', label: 'Compras', icon: ClipboardList },
+    { to: '/categories', label: 'Categorías', icon: Tags },
+    { to: '/invoices', label: 'Factura', icon: FileText },
+    ...(isAdmin ? [{ to: '/settings', label: 'Ajustes', icon: Settings }] : []),
+  ], [isAdmin])
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }

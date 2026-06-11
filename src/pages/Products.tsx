@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from 'react'
 import { Formik, Form } from 'formik'
-import { Plus, Pencil, Search, Image as ImageIcon, X, ChevronRight, Upload, MessageCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Image as ImageIcon, X, ChevronRight, Upload, MessageCircle } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -18,6 +18,7 @@ import { useCategories } from '../hooks/useCategories'
 import { productSchema } from '../lib/validation'
 import type { Product } from '../types'
 import { config } from '../config'
+import { useAuth } from '../contexts/AuthContext'
 
 interface ProductFormValues {
   name: string; brand: string; barcode: string; categoryId: string
@@ -46,6 +47,7 @@ function ProductThumb({ src, className }: { src?: string; className?: string }) 
 }
 
 export function Products() {
+  const { isAdmin } = useAuth()
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('')
   const [formModalOpen, setFormModalOpen] = useState(false)
@@ -131,10 +133,11 @@ export function Products() {
           <Button variant="surface" size="sm" onClick={(e) => openEdit(e, p.id)}>
             <Pencil size={14} className="text-muted-light" />
           </Button>
-          {/* Delete button ocultado — disponible solo para admin en el futuro */}
-          {/* <Button variant="surface" size="sm" onClick={(e) => handleDeleteClick(e, p)}>
-            <Trash2 size={14} className="text-danger-text" />
-          </Button> */}
+          {isAdmin && (
+            <Button variant="surface" size="sm" onClick={(e) => { e.stopPropagation(); setDeleteConfirm(p) }}>
+              <Trash2 size={14} className="text-danger-text" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -201,7 +204,11 @@ export function Products() {
                     <Button variant="surface" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(e, p.id) }}>
                       <Pencil size={13} className="text-muted-light" />
                     </Button>
-                    {/* Delete button ocultado — disponible solo para admin en el futuro */}
+                    {isAdmin && (
+                      <Button variant="surface" size="sm" onClick={(e) => { e.stopPropagation(); setDeleteConfirm(p) }}>
+                        <Trash2 size={13} className="text-danger-text" />
+                      </Button>
+                    )}
                     <ChevronRight size={16} className="mt-0.5 text-muted" />
                   </div>
                 </div>

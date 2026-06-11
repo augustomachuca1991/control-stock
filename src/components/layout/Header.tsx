@@ -31,7 +31,7 @@ interface HeaderProps {
 
 export function Header({ onToggleSidebar }: HeaderProps) {
   const { pathname } = useLocation()
-  const { user, signOut } = useAuth()
+  const { user, signOut, isAdmin } = useAuth()
   const { profile, update: updateProfile, uploadAvatar, uploading } = useProfile(user?.id)
   const navigate = useNavigate()
   const title = titles[pathname] ?? 'Control de Stock'
@@ -136,12 +136,14 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   <UserCog size={14} /> Editar perfil
                 </button>
 
-                <button
-                  onClick={() => { setDropdownOpen(false); navigate('/settings') }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-muted transition-colors hover:bg-surface hover:text-text"
-                >
-                  <Database size={14} /> Respaldo y Restauración
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => { setDropdownOpen(false); navigate('/settings') }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-muted transition-colors hover:bg-surface hover:text-text"
+                  >
+                    <Database size={14} /> Respaldo y Restauración
+                  </button>
+                )}
 
                 <button
                   onClick={handleLogout}
