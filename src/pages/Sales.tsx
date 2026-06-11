@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from 'react'
 import { Formik, Form } from 'formik'
 import type { FormikProps } from 'formik'
-import { Plus, Minus, Trash2, FileText, AlertCircle, ShoppingCart, Search, X, Eye, Package } from 'lucide-react'
+import { Plus, Minus, Trash2, FileText, AlertCircle, ShoppingCart, Search, X, Package } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
@@ -28,12 +28,6 @@ const paymentLabels: Record<PaymentMethod, string> = {
   cash: 'Efectivo',
   card: 'Tarjeta',
   transfer: 'Transferencia',
-}
-
-const paymentVariants: Record<PaymentMethod, 'success' | 'info' | 'warning'> = {
-  cash: 'success',
-  card: 'info',
-  transfer: 'warning',
 }
 
 function StatusBadge({ status }: { status: SaleStatus }) {
@@ -87,6 +81,7 @@ export function Sales() {
       })
     }
   }, [])
+
   const [confirming, setConfirming] = useState(false)
   const [voiding, setVoiding] = useState(false)
   const [previewPaymentMethod, setPreviewPaymentMethod] = useState<PaymentMethod>('cash')
@@ -110,6 +105,102 @@ export function Sales() {
   const { create: createSale, voidSale, loading: salesLoading } = useSales()
   const { reduceStock, increaseStock, loading: productsLoading } = useProducts()
   const loading = salesLoading || productsLoading
+
+  const receiptHTML = useCallback((sale: Sale, seller: string | null) => {
+    const itemsRows = sale.items.map((i) => {
+      const desc = getProductById(i.productId)?.description
+      return `
+        <tr>
+          <td style="font-weight:500">${i.productName}</td>
+          <td style="color:#888">${desc || `<i>${i.productName}</i>`}</td>
+          <td class="r">${i.quantity}</td>
+          <td class="r">${config.currency.symbol}${i.unitPrice.toFixed(2)}</td>
+          <td class="r">${config.currency.symbol}${(i.quantity * i.unitPrice).toFixed(2)}</td>
+        </tr>`
+    }).join('')
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+      @page{margin:0}
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:#222;padding:24px}
+      .hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #d4a853;padding-bottom:16px;margin-bottom:16px}
+      .hdr-l{display:flex;gap:12px;align-items:center}
+      .hdr-l h2{font-size:18px;font-weight:700;font-family:'Playfair Display',serif}
+      .hdr-l p{font-size:11px;color:#888}
+      .hdr-r{text-align:right;font-size:11px;color:#888}
+      .hdr-r .id{font-size:13px;font-weight:600;color:#222}
+      table{width:100%;border-collapse:collapse;margin-bottom:16px}
+      th{text-align:left;padding:8px 6px;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#aaa;border-bottom:1px solid #eee}
+      th.r,td.r{text-align:right}
+      td{padding:8px 6px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+      .ttl td{font-weight:700;font-size:14px;border-bottom:none;padding-top:12px}
+      .ftr{display:flex;justify-content:space-between;margin-top:16px;padding-top:12px;border-top:1px solid #eee;font-size:11px;color:#888}
+      .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;background:#e8f5e9;color:#2e7d32}
+      .badge-d{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;background:#ffebee;color:#c62828}
+    </style></head><body>
+      <div class="hdr">
+        <div class="hdr-l">
+          <svg viewBox="0 0 220 48" style="width:auto;height:42px" role="img" xmlns="http://www.w3.org/2000/svg"><title>Marely Librería y Papelería</title><text x="0" y="38" font-family="'Playfair Display','Times New Roman',serif" font-size="40" font-weight="900" fill="#c9a84c">M</text><text x="28" y="38" font-family="'Playfair Display','Times New Roman',serif" font-size="40" font-weight="900" fill="#57534e">E</text><line x1="68" y1="6" x2="68" y2="44" stroke="#d4d4d8" stroke-width="0.8" /><text x="78" y="26" font-family="'Playfair Display','Times New Roman',serif" font-size="15" font-weight="700" fill="#57534e" letter-spacing="3">MARELY</text><text x="79" y="40" font-family="'Cormorant Garamond','Georgia',serif" font-size="9" font-weight="300" fill="#888" letter-spacing="2">LIBRERÍA &amp; PAPELERÍA</text></svg>
+          
+        </div>
+        <div class="hdr-r">
+          <p class="id">Comprobante de Venta #${sale.id.slice(-8).toUpperCase()}</p>
+          <p>${new Date(sale.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Producto</th><th>Descripción</th><th class="r">Cant.</th><th class="r">P.Unit.</th><th class="r">Subtotal</th></tr></thead>
+        <tbody>
+          ${itemsRows}
+          <tr class="ttl"><td colspan="4" class="r">Total</td><td class="r">${config.currency.symbol}${sale.total.toFixed(2)}</td></tr>
+        </tbody>
+      </table>
+      <div class="ftr">
+        <div><p>Método de pago: ${paymentLabels[sale.paymentMethod]}</p><p>Estado: <span class="${sale.status === 'voided' ? 'badge-d' : 'badge'}">${sale.status === 'voided' ? 'Anulada' : 'Activa'}</span></p></div>
+        <div class="r">${seller ? `<p>Vendedor: ${seller}</p>` : ''}</div>
+      </div>
+      <div style="position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:-1;">
+        <span style="font-size:140px;font-weight:900;color:#000;opacity:0.03;transform:rotate(-25deg);font-family:'Times New Roman',serif;letter-spacing:15px;">NO FACTURA</span>
+      </div>
+      <p style="text-align:center;font-size:9px;font-style:italic;color:#999;margin-top:20px;padding-top:10px;border-top:1px solid #eee;">* Este documento es un comprobante interno de control de stock. No válido como factura fiscal.</p>
+    </body></html>`
+  }, [getProductById])
+
+  const exportToCSV = useCallback(() => {
+    if (!detailSale) return
+    const sep = ';'
+    const head = ['Producto', 'Cantidad', 'Precio Unit.', 'Subtotal']
+    const rows = detailSale.items.map(i => [
+      `"${i.productName}"`, i.quantity, `${config.currency.symbol}${i.unitPrice.toFixed(2)}`, `${config.currency.symbol}${(i.quantity * i.unitPrice).toFixed(2)}`,
+    ])
+    const total = [`"Total"`, '', '', `${config.currency.symbol}${detailSale.total.toFixed(2)}`]
+    const csv = [head.join(sep), ...rows.map(r => r.join(sep)), total.join(sep)].join('\n')
+    const bom = '\uFEFF'
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `venta_${detailSale.id.slice(-8)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [detailSale])
+
+  const exportToPDF = useCallback(() => {
+    if (!detailSale) return
+    const html = receiptHTML(detailSale, sellerName)
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'absolute'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = 'none'
+    document.body.appendChild(iframe)
+    const doc = iframe.contentDocument || iframe.contentWindow?.document
+    if (doc) { doc.open(); doc.write(html); doc.close() }
+    setTimeout(() => {
+      iframe.contentWindow?.focus()
+      iframe.contentWindow?.print()
+      setTimeout(() => document.body.removeChild(iframe), 1000)
+    }, 500)
+  }, [detailSale, sellerName, receiptHTML])
 
   // Derived stats
   const activeSales = useMemo(() => sales.filter((s) => s.status === 'active'), [sales])
@@ -507,7 +598,7 @@ export function Sales() {
                         className="text-[11px] transition-opacity hover:opacity-70 flex items-center gap-1"
                         style={{ color: 'var(--clr-muted)' }}
                       >
-                        <Eye size={11} /> Detalle
+                        Detalle
                       </button>
                       {!isVoided && (
                         <button
@@ -843,8 +934,10 @@ export function Sales() {
             </p>
           </div>
         )}
-        <div className="mt-6 flex justify-end">
-          <Button variant="gold-outline" onClick={() => { setDetailModalOpen(false); setDetailSale(null) }}>Cerrar</Button>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="surface" onClick={() => { setDetailModalOpen(false); setDetailSale(null) }}>Cerrar</Button>
+          <Button variant="gold-outline" size="sm" onClick={exportToCSV}>CSV</Button>
+          <Button variant="gold" size="sm" onClick={exportToPDF}>PDF</Button>
         </div>
       </Modal>
 
