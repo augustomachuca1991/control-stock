@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Database, Download, Trash2, Upload, AlertTriangle, Loader2, FileText } from 'lucide-react'
+import { Badge } from '../components/ui/Badge'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
@@ -185,7 +186,14 @@ export function Settings() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className={`inline-block h-[7px] w-[7px] rounded-full ${b.status === 'completed' ? 'bg-success' : 'bg-danger-text'}`} title={b.status === 'completed' ? 'Completado' : 'Fallido'} />
-                        <p className="text-[12px] font-medium text-text truncate">{b.fileName}</p>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="text-[12px] font-medium text-text truncate">{b.fileName}</p>
+                          {b.userEmail === 'system@automated-backup' ? (
+                            <Badge variant="info">Automático</Badge>
+                          ) : (
+                            <Badge variant="default">Manual</Badge>
+                          )}
+                        </div>
                       </div>
                       <p className="text-[10px] text-muted">
                         {new Date(b.createdAt).toLocaleDateString('es-ES', { dateStyle: 'long' })}
