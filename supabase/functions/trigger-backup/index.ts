@@ -59,6 +59,28 @@ async function listBucketRecursive(
   return all;
 }
 
+async function getAnyUserId(
+  supabase: ReturnType<typeof createClient>,
+): Promise<string> {
+  const { data: profiles } = await supabase.from("profiles").select("id").limit(1);
+  if (profiles?.length) return profiles[0].id as string;
+
+  const { data: backups } = await supabase
+    .from("backups")
+    .select("user_id")
+    .not("user_id", "is", null)
+    .limit(1);
+  if (backups?.length) return backups[0].user_id as string;
+
+  const { data: products } = await supabase
+    .from("products")
+    .select("user_id")
+    .limit(1);
+  if (products?.length) return products[0].user_id as string;
+
+  throw new Error("No se encontró ningún usuario en la base de datos");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return json({}, 204);
 
@@ -114,8 +136,10 @@ serve(async (req) => {
     }
 
     const duration = Date.now() - start;
+    const userId = await getAnyUserId(supabase);
 
     const { error: insertErr } = await supabase.from("backups").insert({
+      user_id: userId,
       file_name: fileName,
       file_path: filePath,
       size_bytes: bytes,
