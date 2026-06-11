@@ -86,8 +86,8 @@ serve(async (req) => {
 
   try {
     const cronSecret = Deno.env.get("CRON_SECRET");
-    const authHeader = req.headers.get("Authorization");
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    const cronHeader = req.headers.get("x-cron-secret");
+    if (cronSecret && cronHeader !== cronSecret) {
       return json({ error: "No autorizado" }, 401);
     }
 

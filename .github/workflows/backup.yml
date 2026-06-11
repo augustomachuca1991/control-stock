@@ -12,6 +12,6 @@ jobs:
       - name: Llamar a Edge Function de backup
         run: |
           curl -sS -X POST "${{ secrets.SUPABASE_FUNCTION_URL }}/trigger-backup" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
             -w "\nHTTP_STATUS:%{http_code}"
