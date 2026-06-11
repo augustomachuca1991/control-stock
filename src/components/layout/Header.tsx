@@ -138,7 +138,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
                 {isAdmin && (
                   <button
-                    onClick={() => { setDropdownOpen(false); navigate('/settings') }}
+                    onClick={() => { setDropdownOpen(false); navigate('/settings?tab=backup') }}
                     className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-muted transition-colors hover:bg-surface hover:text-text"
                   >
                     <Database size={14} /> Respaldo y Restauración

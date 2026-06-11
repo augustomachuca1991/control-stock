@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Database, Download, Trash2, Upload, AlertTriangle, Loader2, FileText, Users, Shield, ShieldOff, Ban, CheckCircle2 } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { Badge } from '../components/ui/Badge'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -15,8 +16,8 @@ type Tab = 'users' | 'backup'
 export function Settings() {
   const { backups, loading: backupsLoading, creating, TABLES, STORAGE_BUCKETS, create: createBackup, remove, downloadBackup, restore } = useBackups()
   const { users, roles, loading: usersLoading, updateRole, toggleBlock } = useUsers()
-
-  const [activeTab, setActiveTab] = useState<Tab>('backup')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab: Tab = (searchParams.get('tab') as Tab) || 'users'
   const [selectedTables, setSelectedTables] = useState<string[]>([])
   const [selectAll, setSelectAll] = useState(true)
   const [restoreModalOpen, setRestoreModalOpen] = useState(false)
@@ -94,15 +95,14 @@ export function Settings() {
       {/* Tabs */}
       <div className="flex gap-1 rounded-lg border border-border bg-surface p-1">
         <button
-          onClick={() => setActiveTab('users')}
-          className={`flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-medium transition-colors ${
-            activeTab === 'users' ? 'bg-primary-dim text-primary-light' : 'text-muted hover:text-text'
-          }`}
+          onClick={() => setSearchParams({ tab: 'users' })}
+          className={`flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-medium transition-colors ${activeTab === 'users' ? 'bg-primary-dim text-primary-light' : 'text-muted hover:text-text'
+            }`}
         >
           <Users size={15} /> Usuarios
         </button>
         <button
-          onClick={() => setActiveTab('backup')}
+          onClick={() => setSearchParams({ tab: 'backup' })}
           className={`flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-medium transition-colors ${activeTab === 'backup' ? 'bg-primary-dim text-primary-light' : 'text-muted hover:text-text'
             }`}
         >

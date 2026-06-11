@@ -35,10 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       const u = data.session?.user ?? null
       setUser(u)
-      updateRoles(u?.id ?? null)
+      await updateRoles(u?.id ?? null)
       setLoading(false)
     })
 
