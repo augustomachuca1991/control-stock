@@ -33,7 +33,7 @@ interface Entry {
 }
 
 export function Purchases() {
-  const [tab, setTab] = useState<'new' | 'history'>('new')
+  const [tab, setTab] = useState<'new' | 'history'>('history')
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0])
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -182,15 +182,7 @@ export function Purchases() {
     <div className="space-y-6">
       {/* Tabs */}
       <div className="flex gap-1 rounded-lg border border-border bg-surface p-1 w-fit">
-        <button
-          onClick={() => setTab('new')}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${tab === 'new'
-            ? 'bg-primary-dim text-primary-light'
-            : 'text-muted hover:text-muted-light'
-            }`}
-        >
-          <Package size={14} /> Nuevo Ingreso
-        </button>
+
         <button
           onClick={() => setTab('history')}
           className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${tab === 'history'
@@ -199,6 +191,15 @@ export function Purchases() {
             }`}
         >
           <History size={14} /> Historial ({purchases.length})
+        </button>
+        <button
+          onClick={() => setTab('new')}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${tab === 'new'
+            ? 'bg-primary-dim text-primary-light'
+            : 'text-muted hover:text-muted-light'
+            }`}
+        >
+          <Package size={14} /> Nuevo Ingreso
         </button>
       </div>
 
@@ -389,7 +390,7 @@ export function Purchases() {
                       <p className="text-[13px] font-semibold text-text">Compra #{pch.id.slice(-6).toUpperCase()}</p>
                       <p className="text-[11px] text-muted">
                         {new Date(pch.createdAt).toLocaleDateString('es-ES', { dateStyle: 'long' })}
-                        {pch.date && ` · Comp. ${new Date(+pch.date.slice(0,4), +pch.date.slice(5,7)-1, +pch.date.slice(8,10)).toLocaleDateString('es-ES')}`}
+                        {pch.date && ` · Comp. ${new Date(+pch.date.slice(0, 4), +pch.date.slice(5, 7) - 1, +pch.date.slice(8, 10)).toLocaleDateString('es-ES')}`}
                       </p>
                       {pch.userEmail && (
                         <p className="text-[10px] text-muted mt-0.5">Registró: {pch.userEmail}</p>
@@ -440,7 +441,7 @@ export function Purchases() {
             <div className="text-right text-[12px] text-muted-light">
               <p>
                 <span className="text-muted">Fecha: </span>
-                {new Date(+invoiceDate.slice(0,4), +invoiceDate.slice(5,7)-1, +invoiceDate.slice(8,10)).toLocaleDateString('es-ES', { dateStyle: 'long' })}
+                {new Date(+invoiceDate.slice(0, 4), +invoiceDate.slice(5, 7) - 1, +invoiceDate.slice(8, 10)).toLocaleDateString('es-ES', { dateStyle: 'long' })}
               </p>
               <p className="text-[11px] text-muted">Comprobante #{Date.now().toString().slice(-6)}</p>
             </div>
