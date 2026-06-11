@@ -1,25 +1,69 @@
 import { useState, useMemo, useCallback, useRef } from 'react'
 import { Formik, Form } from 'formik'
 import type { FormikProps } from 'formik'
-import { Plus, Minus, Trash2, FileText, AlertCircle, ShoppingCart } from 'lucide-react'
+import { Plus, Minus, Trash2, FileText, AlertCircle, ShoppingCart, Search, X, Eye, Package } from 'lucide-react'
 import { toast } from 'sonner'
-import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { SearchSelect } from '../components/ui/SearchSelect'
 import { Input } from '../components/ui/Input'
 import { SelectField } from '../components/ui/SelectField'
-import { Badge } from '../components/ui/Badge'
-import { Table } from '../components/ui/Table'
+import { Img } from '../components/ui/Img'
+import MarelyLogo from '../components/ui/MarelyLogo'
 import { SkeletonRow } from '../components/ui/Skeleton'
 import { useProductStore } from '../stores/useProductStore'
 import { useSaleStore } from '../stores/useSaleStore'
 import { useSales } from '../hooks/useSales'
 import { useProducts } from '../hooks/useProducts'
+import { supabase } from '../lib/supabaseClient'
 import { saleSchema } from '../lib/validation'
 import type { Sale, SaleStatus, PaymentMethod } from '../types'
 import type { CartItem } from '../stores/useSaleStore'
 import { config } from '../config'
+
+type FilterStatus = 'all' | 'active' | 'voided'
+type FilterPayment = 'all' | PaymentMethod
+
+const paymentLabels: Record<PaymentMethod, string> = {
+  cash: 'Efectivo',
+  card: 'Tarjeta',
+  transfer: 'Transferencia',
+}
+
+const paymentVariants: Record<PaymentMethod, 'success' | 'info' | 'warning'> = {
+  cash: 'success',
+  card: 'info',
+  transfer: 'warning',
+}
+
+function StatusBadge({ status }: { status: SaleStatus }) {
+  if (status === 'voided')
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-danger-dim px-2 py-0.5 text-[11px] font-medium text-danger-text">
+        <span className="h-1.5 w-1.5 rounded-full bg-danger-text" />
+        Anulada
+      </span>
+    )
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-success-dim px-2 py-0.5 text-[11px] font-medium text-success-text">
+      <span className="h-1.5 w-1.5 rounded-full bg-success-text" />
+      Activa
+    </span>
+  )
+}
+
+function PaymentTag({ method }: { method: PaymentMethod }) {
+  const styles: Record<PaymentMethod, string> = {
+    cash: 'bg-success-dim text-success-text',
+    card: 'bg-primary-dim text-primary-text',
+    transfer: 'bg-warning-dim text-warning-text',
+  }
+  return (
+    <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-medium ${styles[method]}`}>
+      {paymentLabels[method]}
+    </span>
+  )
+}
 
 export function Sales() {
   const [modalOpen, setModalOpen] = useState(false)
@@ -30,8 +74,28 @@ export function Sales() {
   const [lastSale, setLastSale] = useState<Sale | null>(null)
   const [voidConfirmOpen, setVoidConfirmOpen] = useState(false)
   const [saleToVoid, setSaleToVoid] = useState<Sale | null>(null)
+  const [detailSale, setDetailSale] = useState<Sale | null>(null)
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [sellerName, setSellerName] = useState<string | null>(null)
+  const openDetail = useCallback((sale: Sale) => {
+    setDetailSale(sale)
+    setDetailModalOpen(true)
+    setSellerName(null)
+    if (sale.userId) {
+      supabase.from('profiles').select('full_name').eq('id', sale.userId).single().then(({ data }) => {
+        if (data?.full_name) setSellerName(data.full_name)
+      })
+    }
+  }, [])
   const [confirming, setConfirming] = useState(false)
+  const [voiding, setVoiding] = useState(false)
   const [previewPaymentMethod, setPreviewPaymentMethod] = useState<PaymentMethod>('cash')
+
+  // filters & search
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
+  const [filterPayment, setFilterPayment] = useState<FilterPayment>('all')
+  const [search, setSearch] = useState('')
+
   const quantityRef = useRef<HTMLInputElement>(null)
   const saleFormikRef = useRef<FormikProps<{ paymentMethod: PaymentMethod }>>(null)
 
@@ -46,6 +110,32 @@ export function Sales() {
   const { create: createSale, voidSale, loading: salesLoading } = useSales()
   const { reduceStock, increaseStock, loading: productsLoading } = useProducts()
   const loading = salesLoading || productsLoading
+
+  // Derived stats
+  const activeSales = useMemo(() => sales.filter((s) => s.status === 'active'), [sales])
+  const totalToday = useMemo(
+    () => activeSales.reduce((sum, s) => sum + s.total, 0),
+    [activeSales]
+  )
+  const avgTicket = useMemo(
+    () => (activeSales.length > 0 ? totalToday / activeSales.length : 0),
+    [activeSales, totalToday]
+  )
+
+  // Filtered + searched sales
+  const filteredSales = useMemo(() => {
+    return sales.filter((s) => {
+      if (filterStatus !== 'all' && s.status !== filterStatus) return false
+      if (filterPayment !== 'all' && s.paymentMethod !== filterPayment) return false
+      if (search.trim()) {
+        const q = search.toLowerCase()
+        const matchId = s.id.slice(-6).toLowerCase().includes(q)
+        const matchItems = s.items.some((i) => i.productName.toLowerCase().includes(q))
+        if (!matchId && !matchItems) return false
+      }
+      return true
+    })
+  }, [sales, filterStatus, filterPayment, search])
 
   const openCreate = useCallback(() => {
     setSelectedProductId('')
@@ -62,12 +152,11 @@ export function Sales() {
       toast.error(`${product.name} no tiene stock disponible`)
       return
     }
-
     const existing = cart.find((c) => c.productId === selectedProductId)
     const currentCartQty = existing ? existing.quantity : 0
     const available = product.stock - currentCartQty
     if (available <= 0) {
-      toast.error(`Stock insuficiente de ${product.name} (quedan ${product.stock} uds. y ya agregaste ${currentCartQty})`)
+      toast.error(`Stock insuficiente de ${product.name}`)
       return
     }
     const qty = Math.min(q, available)
@@ -87,15 +176,14 @@ export function Sales() {
     updateCartItem(productId, delta)
   }, [updateCartItem])
 
-  const cartTotal = useMemo(() =>
-    cart.reduce((sum, c) => sum + c.quantity * c.unitPrice, 0),
+  const cartTotal = useMemo(
+    () => cart.reduce((sum, c) => sum + c.quantity * c.unitPrice, 0),
     [cart]
   )
 
   const handleConfirmSale = useCallback(async () => {
     setConfirming(true)
     const paymentMethod = saleFormikRef.current?.values.paymentMethod ?? 'cash'
-
     for (const item of cart) {
       const product = getProductById(item.productId)
       if (!product) {
@@ -104,12 +192,11 @@ export function Sales() {
         return
       }
       if (product.stock < item.quantity) {
-        toast.error(`Stock insuficiente para "${item.productName}": disponible ${product.stock}, requerido ${item.quantity}`)
+        toast.error(`Stock insuficiente para "${item.productName}"`)
         setConfirming(false)
         return
       }
     }
-
     const { data: sale } = await createSale({
       items: cart.map((c) => ({
         productId: c.productId,
@@ -122,9 +209,7 @@ export function Sales() {
     if (sale) {
       const results = await Promise.allSettled(cart.map((c) => reduceStock(c.productId, c.quantity)))
       const failures = results.filter((r) => r.status === 'rejected')
-      if (failures.length > 0) {
-        toast.error(`Error al actualizar stock de ${failures.length} producto(s)`)
-      }
+      if (failures.length > 0) toast.error(`Error al actualizar stock de ${failures.length} producto(s)`)
       setLastSale(sale)
     }
     setConfirming(false)
@@ -133,8 +218,6 @@ export function Sales() {
     clearCart()
     if (sale) setReceiptOpen(true)
   }, [cart, createSale, reduceStock, getProductById, clearCart])
-
-  const [voiding, setVoiding] = useState(false)
 
   const handleVoidSale = useCallback(async () => {
     if (!saleToVoid) return
@@ -146,119 +229,321 @@ export function Sales() {
     setSaleToVoid(null)
   }, [saleToVoid, increaseStock, voidSale])
 
-  const productOptions = useMemo(() =>
-    products
-      .filter((p) => p.enabled !== false && p.stock > 0)
-      .map((p) => ({
-        value: p.id,
-        label: `${p.name} — ${config.currency.symbol}${p.price.toFixed(2)} (${p.stock} uds.) · ${p.barcode}`,
-      })),
+  const productOptions = useMemo(
+    () =>
+      products
+        .filter((p) => p.enabled !== false && p.stock > 0)
+        .map((p) => ({
+          value: p.id,
+          label: `${p.name} — ${config.currency.symbol}${p.price.toFixed(2)} (${p.stock} uds.) · ${p.barcode}`,
+        })),
     [products]
   )
 
-  const paymentLabels = { cash: 'Efectivo', card: 'Tarjeta', transfer: 'Transferencia' }
-  const paymentVariants = { cash: 'success' as const, card: 'info' as const, transfer: 'warning' as const }
-
-  const statusBadge = (status: SaleStatus) => {
-    if (status === 'voided') return <Badge variant="danger">Anulada</Badge>
-    return <Badge variant="success">Activa</Badge>
-  }
-
-  const saleColumns = [
-    { key: 'id', header: 'Venta', render: (s: Sale) => <span className={`font-medium ${s.status === 'voided' ? 'line-through text-muted' : ''}`}>#{s.id.slice(-4)}</span> },
-    { key: 'status', header: 'Estado', render: (s: Sale) => statusBadge(s.status) },
-    { key: 'items', header: 'Productos', render: (s: Sale) => <span className={s.status === 'voided' ? 'line-through text-muted' : ''}>{s.items.map((i) => `${i.productName} x${i.quantity}`).join(', ')}</span> },
-    { key: 'total', header: 'Total', render: (s: Sale) => <span className={`font-semibold ${s.status === 'voided' ? 'line-through text-muted' : ''}`}>{config.currency.symbol}{s.total.toFixed(2)}</span> },
-    { key: 'payment', header: 'Método', render: (s: Sale) => <Badge variant={paymentVariants[s.paymentMethod]}>{paymentLabels[s.paymentMethod]}</Badge> },
-    { key: 'date', header: 'Fecha', render: (s: Sale) => new Date(s.createdAt).toLocaleDateString('es-ES', { dateStyle: 'medium' }) },
-    {
-      key: 'actions', header: '', render: (s: Sale) =>
-        s.status === 'active' ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); setSaleToVoid(s); setVoidConfirmOpen(true) }}
-            className="text-[11px] text-danger-text hover:underline transition-colors"
-          >
-            Anular
-          </button>
-        ) : null
-    },
-  ]
+  const hasActiveFilters = filterStatus !== 'all' || filterPayment !== 'all' || search.trim() !== ''
 
   return (
     <>
-      {/* Barra de carrito activo (solo cuando hay items y el modal está cerrado) */}
+      {/* Cart banner */}
       {cart.length > 0 && !modalOpen && (
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-accent/40 bg-accent-dim/20 px-4 py-2.5">
+        <div
+          className="mb-4 flex items-center justify-between rounded-xl border px-4 py-3"
+          style={{
+            borderColor: 'var(--clr-border)',
+            background: 'var(--clr-primary-dim)',
+          }}
+        >
           <div className="flex items-center gap-2">
-            <ShoppingCart size={16} className="text-accent" />
-            <span className="text-[12px] text-text">
-              <span className="font-semibold">{cart.length} producto{cart.length !== 1 ? 's' : ''}</span> en el carrito
+            <ShoppingCart size={15} style={{ color: 'var(--clr-primary)' }} />
+            <span className="text-[12px]" style={{ color: 'var(--clr-text)' }}>
+              <span className="font-medium">{cart.length} producto{cart.length !== 1 ? 's' : ''}</span> en el carrito
             </span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={clearCart}
-              className="text-[11px] text-muted underline transition-colors hover:text-danger-text"
+              className="text-[11px] underline transition-colors"
+              style={{ color: 'var(--clr-muted)' }}
             >
-              Vaciar carrito
+              Vaciar
             </button>
             <Button variant="gold" size="sm" onClick={() => setModalOpen(true)}>
-              <ShoppingCart size={14} /> Ir al carrito
+              <ShoppingCart size={13} /> Ir al carrito
             </Button>
           </div>
         </div>
       )}
 
-      <Card
-        title="Ventas"
-        subtitle={`${sales.length} venta${sales.length !== 1 ? 's' : ''} registradas`}
-        actions={cart.length === 0 && <Button variant="gold" size="sm" onClick={openCreate}><Plus size={16} /> Nueva Venta</Button>}
+      {/* Main panel */}
+      <div
+        className="rounded-2xl border overflow-hidden"
+        style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-card)' }}
       >
-        {loading ? (
-          <div className="divide-y divide-border/50 rounded-lg border border-border">
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-5 py-4 border-b"
+          style={{ borderColor: 'var(--clr-border)' }}
+        >
+          <div>
+            <h2
+              className="text-[17px] font-semibold leading-tight"
+              style={{ fontFamily: '"Playfair Display", serif', color: 'var(--clr-text)' }}
+            >
+              Ventas
+            </h2>
+            <p className="text-[12px] mt-0.5" style={{ color: 'var(--clr-muted)' }}>
+              {sales.length} venta{sales.length !== 1 ? 's' : ''} registradas
+            </p>
           </div>
-        ) : (
-        <Table
-          columns={saleColumns}
-          data={sales}
-          keyExtractor={(s) => s.id}
-          emptyMessage="No hay ventas registradas"
-          renderCard={(s) => (
-            <div className={`space-y-2 ${s.status === 'voided' ? 'opacity-60' : ''}`}>
-              <div className="flex items-center justify-between">
-                <span className={`font-medium text-text ${s.status === 'voided' ? 'line-through' : ''}`}>#{s.id.slice(-4)}</span>
-                <div className="flex items-center gap-2">
-                  {statusBadge(s.status)}
-                  <Badge variant={paymentVariants[s.paymentMethod]}>{paymentLabels[s.paymentMethod]}</Badge>
-                </div>
+          <div className="flex items-center gap-3">
+            {/* Mini stats */}
+            <div className="hidden sm:flex items-center gap-4 mr-2">
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--clr-muted)' }}>Total activo</p>
+                <p className="text-[14px] font-semibold" style={{ color: 'var(--clr-primary)' }}>
+                  {config.currency.symbol}{totalToday.toFixed(2)}
+                </p>
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] text-muted">{new Date(s.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                  {s.status !== 'voided' && (
-                    <button
-                      onClick={() => {
-                        setSaleToVoid(s); setVoidConfirmOpen(true)
-                      }}
-                      className="text-[11px] text-danger-text hover:underline"
-                    >
-                      Anular
-                    </button>
-                  )}
-                </div>
-                <span className={`font-semibold text-text ${s.status === 'voided' ? 'line-through text-muted' : ''}`}>{config.currency.symbol}{s.total.toFixed(2)}</span>
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--clr-muted)' }}>Ticket prom.</p>
+                <p className="text-[14px] font-semibold" style={{ color: 'var(--clr-text)' }}>
+                  {config.currency.symbol}{avgTicket.toFixed(2)}
+                </p>
               </div>
             </div>
-          )}
-        />
-        )}
-      </Card>
+            {cart.length === 0 && (
+              <Button variant="gold" size="sm" onClick={openCreate}>
+                <Plus size={15} /> Nueva venta
+              </Button>
+            )}
+          </div>
+        </div>
 
+        {/* Filters + Search bar */}
+        <div
+          className="flex flex-col sm:flex-row sm:items-center gap-2 px-5 py-3 border-b"
+          style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-bg)' }}
+        >
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--clr-muted)' }} />
+            <input
+              type="text"
+              placeholder="Buscar por producto o ID..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-lg pl-8 pr-8 py-2 text-[13px] border outline-none transition-colors placeholder:text-[var(--clr-muted)]"
+              style={{
+                background: 'var(--clr-surface)',
+                borderColor: 'var(--clr-border)',
+                color: 'var(--clr-text)',
+                colorScheme: 'dark',
+              }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2"
+                style={{ color: 'var(--clr-muted)' }}
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Status filter pills */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {(['all', 'active', 'voided'] as FilterStatus[]).map((f) => {
+              const labels = { all: 'Todas', active: 'Activas', voided: 'Anuladas' }
+              const isActive = filterStatus === f
+              return (
+                <button
+                  key={f}
+                  onClick={() => setFilterStatus(f)}
+                  className="rounded-full px-3 py-1 text-[12px] font-medium transition-all border"
+                  style={
+                    isActive
+                      ? { background: 'var(--clr-primary)', color: '#fff', borderColor: 'var(--clr-primary)' }
+                      : { background: 'transparent', color: 'var(--clr-muted)', borderColor: 'var(--clr-border)' }
+                  }
+                >
+                  {labels[f]}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Payment filter */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {(['all', 'cash', 'card', 'transfer'] as FilterPayment[]).map((f) => {
+              const labels = { all: 'Todos', cash: 'Efectivo', card: 'Tarjeta', transfer: 'Transfer.' }
+              const isActive = filterPayment === f
+              return (
+                <button
+                  key={f}
+                  onClick={() => setFilterPayment(f)}
+                  className="rounded-full px-3 py-1 text-[12px] font-medium transition-all border"
+                  style={
+                    isActive
+                      ? { background: 'var(--clr-accent)', color: 'var(--clr-bg)', borderColor: 'var(--clr-accent)' }
+                      : { background: 'transparent', color: 'var(--clr-muted)', borderColor: 'var(--clr-border)' }
+                  }
+                >
+                  {labels[f]}
+                </button>
+              )
+            })}
+          </div>
+
+          {hasActiveFilters && (
+            <button
+              onClick={() => { setFilterStatus('all'); setFilterPayment('all'); setSearch('') }}
+              className="text-[11px] flex items-center gap-1 shrink-0"
+              style={{ color: 'var(--clr-primary-text)' }}
+            >
+              <X size={11} /> Limpiar
+            </button>
+          )}
+        </div>
+
+        {/* Sale list */}
+        <div className="p-4 flex flex-col gap-2.5">
+          {loading ? (
+            <>
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </>
+          ) : filteredSales.length === 0 ? (
+            <div className="py-14 flex flex-col items-center gap-2">
+              <ShoppingCart size={28} style={{ color: 'var(--clr-muted)' }} />
+              <p className="text-[13px]" style={{ color: 'var(--clr-muted)' }}>
+                {hasActiveFilters ? 'No hay ventas que coincidan con los filtros' : 'No hay ventas registradas'}
+              </p>
+              {hasActiveFilters && (
+                <button
+                  onClick={() => { setFilterStatus('all'); setFilterPayment('all'); setSearch('') }}
+                  className="text-[12px] underline"
+                  style={{ color: 'var(--clr-primary-text)' }}
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+          ) : (
+            filteredSales.map((sale) => {
+              const isVoided = sale.status === 'voided'
+              return (
+                <div
+                  key={sale.id}
+                  className="flex items-start gap-3 rounded-xl border px-4 py-3.5 transition-colors"
+                  style={{
+                    borderColor: isVoided ? 'var(--clr-border-subtle)' : 'var(--clr-border)',
+                    background: 'var(--clr-surface)',
+                    opacity: isVoided ? 0.6 : 1,
+                  }}
+                >
+                  {/* Status dot */}
+                  <div
+                    className="w-2 h-2 rounded-full shrink-0 mt-[5px]"
+                    style={{ background: isVoided ? 'var(--clr-danger)' : 'var(--clr-success)' }}
+                  />
+
+                  {/* Main info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className="text-[12px] font-medium tabular-nums"
+                        style={{
+                          color: 'var(--clr-muted)',
+                          textDecoration: isVoided ? 'line-through' : 'none',
+                        }}
+                      >
+                        #{sale.id.slice(-6).toUpperCase()}
+                      </span>
+                      <PaymentTag method={sale.paymentMethod} />
+                      {isVoided && <StatusBadge status="voided" />}
+                    </div>
+                    <p
+                      className="text-[13px] mt-1 truncate"
+                      style={{
+                        color: 'var(--clr-text)',
+                        textDecoration: isVoided ? 'line-through' : 'none',
+                      }}
+                    >
+                      {sale.items.map((i, idx) => (
+                        <span key={i.productId}>
+                          <span style={{ fontStyle: 'italic', fontWeight: 500 }}>{i.productName}</span> x{i.quantity}
+                          {idx < sale.items.length - 1 && <span className="mx-1" style={{ color: 'var(--clr-muted)' }}>·</span>}
+                        </span>
+                      ))}
+                    </p>
+                    <p className="text-[11px] mt-1" style={{ color: 'var(--clr-muted)' }}>
+                      {new Date(sale.createdAt).toLocaleDateString('es-AR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+
+                  {/* Total + actions */}
+                  <div className="text-right shrink-0">
+                    <p
+                      className="text-[15px] font-semibold tabular-nums"
+                      style={{
+                        color: isVoided ? 'var(--clr-muted)' : 'var(--clr-text)',
+                        textDecoration: isVoided ? 'line-through' : 'none',
+                      }}
+                    >
+                      {config.currency.symbol}{sale.total.toFixed(2)}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1.5 justify-end">
+                      <button
+                        onClick={() => openDetail(sale)}
+                        className="text-[11px] transition-opacity hover:opacity-70 flex items-center gap-1"
+                        style={{ color: 'var(--clr-muted)' }}
+                      >
+                        <Eye size={11} /> Detalle
+                      </button>
+                      {!isVoided && (
+                        <button
+                          onClick={() => { setSaleToVoid(sale); setVoidConfirmOpen(true) }}
+                          className="text-[11px] transition-opacity hover:opacity-70"
+                          style={{ color: 'var(--clr-danger-text)' }}
+                        >
+                          Anular
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* Footer count */}
+        {filteredSales.length > 0 && (
+          <div
+            className="px-5 py-2.5 border-t flex items-center justify-between"
+            style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-bg)' }}
+          >
+            <span className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>
+              {filteredSales.length} de {sales.length} venta{sales.length !== 1 ? 's' : ''}
+            </span>
+            <span className="text-[11px] font-medium" style={{ color: 'var(--clr-muted)' }}>
+              {filteredSales.filter((s) => s.status === 'active').length} activas ·{' '}
+              {filteredSales.filter((s) => s.status === 'voided').length} anuladas
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Modal Nueva Venta ── */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nueva Venta" size="lg">
         <Formik
           innerRef={saleFormikRef}
@@ -295,25 +580,40 @@ export function Sales() {
                 </div>
 
                 {cart.length > 0 && (
-                  <div className="rounded-lg border border-border bg-surface">
-                    <div className="border-b border-border px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Carrito</div>
+                  <div
+                    className="rounded-xl border overflow-hidden"
+                    style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-surface)' }}
+                  >
+                    <div
+                      className="px-4 py-2 text-[10px] font-semibold uppercase tracking-widest border-b"
+                      style={{ color: 'var(--clr-muted)', borderColor: 'var(--clr-border)' }}
+                    >
+                      Carrito
+                    </div>
                     {cart.map((item) => (
-                      <div key={item.productId} className="flex items-center justify-between border-b border-border/50 px-4 py-2.5 last:border-0">
+                      <div
+                        key={item.productId}
+                        className="flex items-center justify-between border-b px-4 py-2.5 last:border-0"
+                        style={{ borderColor: 'var(--clr-border-subtle)' }}
+                      >
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-text truncate">{item.productName}</p>
-                          <p className="text-[11px] text-muted">{config.currency.symbol}{item.unitPrice.toFixed(2)} c/u</p>
+                          <p className="text-[13px] font-medium truncate" style={{ color: 'var(--clr-text)' }}>{item.productName}</p>
+                          <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)} c/u</p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <Button variant="gold-outline" size="sm" type="button" onClick={() => updateCartQty(item.productId, -1)}><Minus size={14} /></Button>
-                          <span className="w-8 text-center text-[13px] font-medium text-text">{item.quantity}</span>
+                          <span className="w-8 text-center text-[13px] font-medium" style={{ color: 'var(--clr-text)' }}>{item.quantity}</span>
                           <Button variant="gold" size="sm" type="button" onClick={() => updateCartQty(item.productId, 1)}><Plus size={14} /></Button>
-                          <Button variant="surface" size="sm" type="button" onClick={() => removeFromCart(item.productId)}><Trash2 size={14} className="text-danger-text" /></Button>
+                          <Button variant="surface" size="sm" type="button" onClick={() => removeFromCart(item.productId)}><Trash2 size={14} style={{ color: 'var(--clr-danger-text)' }} /></Button>
                         </div>
                       </div>
                     ))}
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-                      <span className="text-[13px] font-semibold text-text">Total</span>
-                      <span className="text-[18px] font-bold text-accent">{config.currency.symbol}{cartTotal.toFixed(2)}</span>
+                    <div
+                      className="flex items-center justify-between px-4 py-3 border-t"
+                      style={{ borderColor: 'var(--clr-border)' }}
+                    >
+                      <span className="text-[13px] font-semibold" style={{ color: 'var(--clr-text)' }}>Total</span>
+                      <span className="text-[18px] font-bold" style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{cartTotal.toFixed(2)}</span>
                     </div>
                   </div>
                 )}
@@ -328,7 +628,9 @@ export function Sales() {
                   ]}
                 />
 
-                {(errors as any).cart && <p className="text-[11px] text-danger-text">{(errors as any).cart}</p>}
+                {(errors as any).cart && (
+                  <p className="text-[11px]" style={{ color: 'var(--clr-danger-text)' }}>{(errors as any).cart}</p>
+                )}
               </div>
 
               <div className="mt-6 flex justify-end gap-3">
@@ -342,144 +644,241 @@ export function Sales() {
         </Formik>
       </Modal>
 
-      {/* Preview / Comprobante */}
+      {/* ── Modal Preview ── */}
       <Modal open={previewOpen} onClose={() => setPreviewOpen(false)} title="Previsualizar Venta" size="lg">
         <div className="space-y-5">
-          <div className="border-b border-border pb-4">
-            <h3 className="text-[15px] font-bold text-text">{config.storeName}</h3>
-            <p className="text-[12px] text-muted">Comprobante de Venta</p>
-            <p className="text-[11px] text-muted">{new Date().toLocaleDateString('es-ES', { dateStyle: 'long' })}</p>
+          <div className="border-b pb-4" style={{ borderColor: 'var(--clr-border)' }}>
+            <h3 className="text-[15px] font-bold" style={{ fontFamily: '"Playfair Display", serif', color: 'var(--clr-text)' }}>{config.storeName}</h3>
+            <p className="text-[12px]" style={{ color: 'var(--clr-muted)' }}>Comprobante de venta</p>
+            <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{new Date().toLocaleDateString('es-ES', { dateStyle: 'long' })}</p>
           </div>
 
           <table className="w-full text-[12px]">
             <thead>
-              <tr className="border-b border-border text-left">
-                <th className="pb-2 text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Producto</th>
-                <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Cant.</th>
-                <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">P. Unit.</th>
-                <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Subtotal</th>
+              <tr className="border-b text-left" style={{ borderColor: 'var(--clr-border)' }}>
+                <th className="pb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Producto</th>
+                <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Cant.</th>
+                <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>P. Unit.</th>
+                <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Subtotal</th>
               </tr>
             </thead>
             <tbody>
               {cart.map((item) => (
-                <tr key={item.productId} className="border-b border-border/50">
-                  <td className="py-2.5 text-text">{item.productName}</td>
-                  <td className="py-2.5 text-right text-muted-light">{item.quantity}</td>
-                  <td className="py-2.5 text-right text-muted-light">{config.currency.symbol}{item.unitPrice.toFixed(2)}</td>
-                  <td className="py-2.5 text-right font-semibold text-text">{config.currency.symbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
+                <tr key={item.productId} className="border-b" style={{ borderColor: 'var(--clr-border-subtle)' }}>
+                  <td className="py-2.5" style={{ color: 'var(--clr-text)' }}>{item.productName}</td>
+                  <td className="py-2.5 text-right" style={{ color: 'var(--clr-muted-light)' }}>{item.quantity}</td>
+                  <td className="py-2.5 text-right" style={{ color: 'var(--clr-muted-light)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)}</td>
+                  <td className="py-2.5 text-right font-semibold" style={{ color: 'var(--clr-text)' }}>{config.currency.symbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          <div className="flex flex-col items-end gap-1 border-t border-border pt-3">
-            <div className="flex w-56 items-center justify-between text-[12px]">
-              <span className="text-muted">Subtotal</span>
-              <span className="text-muted-light">{config.currency.symbol}{cartTotal.toFixed(2)}</span>
-            </div>
+          <div className="flex flex-col items-end gap-1 border-t pt-3" style={{ borderColor: 'var(--clr-border)' }}>
             <div className="flex w-56 items-center justify-between text-[15px] font-bold">
-              <span className="text-text">Total</span>
-              <span className="text-accent">{config.currency.symbol}{cartTotal.toFixed(2)}</span>
+              <span style={{ color: 'var(--clr-text)' }}>Total</span>
+              <span style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{cartTotal.toFixed(2)}</span>
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-2.5 text-[12px]">
-            <span className="text-muted">Método de pago</span>
-            <Badge variant={paymentVariants[previewPaymentMethod]}>{paymentLabels[previewPaymentMethod]}</Badge>
+          <div className="flex items-center justify-between rounded-xl border px-4 py-2.5 text-[12px]" style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-surface)' }}>
+            <span style={{ color: 'var(--clr-muted)' }}>Método de pago</span>
+            <PaymentTag method={previewPaymentMethod} />
           </div>
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="gold-outline" onClick={() => setPreviewOpen(false)}>Volver</Button>
           <Button variant="gold" onClick={handleConfirmSale} disabled={confirming}>
-            {confirming ? 'Procesando...' : 'Confirmar y Emitir Comprobante'}
+            {confirming ? 'Procesando...' : 'Confirmar y emitir comprobante'}
           </Button>
         </div>
       </Modal>
 
-      {/* Comprobante emitido */}
-      <Modal open={receiptOpen} onClose={() => setReceiptOpen(false)} title="Comprobante Emitido" size="md">
+      {/* ── Modal Comprobante ── */}
+      <Modal open={receiptOpen} onClose={() => setReceiptOpen(false)} title="Comprobante emitido" size="md">
         {lastSale && (
           <div className="space-y-5">
-            <div className="flex flex-col items-center gap-3 border-b border-border pb-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success-dim">
-                <FileText size={24} className="text-success-text" />
+            <div className="flex flex-col items-center gap-3 border-b pb-4" style={{ borderColor: 'var(--clr-border)' }}>
+              <div
+                className="flex h-12 w-12 items-center justify-center rounded-full"
+                style={{ background: 'var(--clr-success-dim)' }}
+              >
+                <FileText size={22} style={{ color: 'var(--clr-success-text)' }} />
               </div>
               <div className="text-center">
-                <h3 className="text-[15px] font-bold text-text">{config.storeName}</h3>
-                <p className="text-[11px] text-muted">Comprobante #{lastSale.id.slice(-8).toUpperCase()}</p>
-                <p className="text-[11px] text-muted">{new Date(lastSale.createdAt).toLocaleDateString('es-ES', { dateStyle: 'long' })}</p>
+                <h3 className="text-[15px] font-bold" style={{ fontFamily: '"Playfair Display", serif', color: 'var(--clr-text)' }}>{config.storeName}</h3>
+                <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>Comprobante #{lastSale.id.slice(-8).toUpperCase()}</p>
+                <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{new Date(lastSale.createdAt).toLocaleDateString('es-ES', { dateStyle: 'long' })}</p>
               </div>
             </div>
 
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="border-b border-border text-left">
-                  <th className="pb-2 text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Producto</th>
-                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Cant.</th>
-                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">P. Unit.</th>
-                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Subtotal</th>
+                <tr className="border-b text-left" style={{ borderColor: 'var(--clr-border)' }}>
+                  <th className="pb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Producto</th>
+                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Cant.</th>
+                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>P. Unit.</th>
+                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Subtotal</th>
                 </tr>
               </thead>
               <tbody>
                 {lastSale.items.map((item) => (
-                  <tr key={item.productId} className="border-b border-border/50">
-                    <td className="py-2.5 text-text">{item.productName}</td>
-                    <td className="py-2.5 text-right text-muted-light">{item.quantity}</td>
-                    <td className="py-2.5 text-right text-muted-light">{config.currency.symbol}{item.unitPrice.toFixed(2)}</td>
-                    <td className="py-2.5 text-right font-semibold text-text">{config.currency.symbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
+                  <tr key={item.productId} className="border-b" style={{ borderColor: 'var(--clr-border-subtle)' }}>
+                    <td className="py-2.5" style={{ color: 'var(--clr-text)' }}>{item.productName}</td>
+                    <td className="py-2.5 text-right" style={{ color: 'var(--clr-muted-light)' }}>{item.quantity}</td>
+                    <td className="py-2.5 text-right" style={{ color: 'var(--clr-muted-light)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)}</td>
+                    <td className="py-2.5 text-right font-semibold" style={{ color: 'var(--clr-text)' }}>{config.currency.symbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
-            <div className="flex flex-col items-end gap-1 border-t border-border pt-3">
+            <div className="flex flex-col items-end gap-1 border-t pt-3" style={{ borderColor: 'var(--clr-border)' }}>
               <div className="flex w-56 items-center justify-between text-[15px] font-bold">
-                <span className="text-text">Total</span>
-                <span className="text-accent">{config.currency.symbol}{lastSale.total.toFixed(2)}</span>
+                <span style={{ color: 'var(--clr-text)' }}>Total</span>
+                <span style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{lastSale.total.toFixed(2)}</span>
               </div>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-2.5 text-[12px]">
-              <span className="text-muted">Método de pago</span>
-              <Badge variant={paymentVariants[lastSale.paymentMethod]}>{paymentLabels[lastSale.paymentMethod]}</Badge>
+            <div className="flex items-center justify-between rounded-xl border px-4 py-2.5 text-[12px]" style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-surface)' }}>
+              <span style={{ color: 'var(--clr-muted)' }}>Método de pago</span>
+              <PaymentTag method={lastSale.paymentMethod} />
             </div>
           </div>
         )}
-
         <div className="mt-6 flex justify-end">
           <Button variant="gold-outline" onClick={() => setReceiptOpen(false)}>Cerrar</Button>
         </div>
       </Modal>
 
-      {/* Confirmación de anulación */}
-      <Modal open={voidConfirmOpen} onClose={() => { setVoidConfirmOpen(false); setSaleToVoid(null) }} title="Anular Venta" size="sm">
+      {/* ── Modal Detalle de Venta ── */}
+      <Modal open={detailModalOpen} onClose={() => { setDetailModalOpen(false); setDetailSale(null) }} title="Detalle de Venta" size="lg">
+        {detailSale && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: 'var(--clr-border)' }}>
+              <div className="flex items-center gap-3">
+                <MarelyLogo iconOnly width={36} />
+                <div>
+                  <h3 className="text-[15px] font-bold" style={{ fontFamily: '"Playfair Display", serif', color: 'var(--clr-text)' }}>{config.storeName}</h3>
+                  <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>Comprobante de Venta</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>#{detailSale.id.slice(-8).toUpperCase()}</p>
+                <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>
+                  {new Date(detailSale.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="border-b text-left" style={{ borderColor: 'var(--clr-border)' }}>
+                  <th className="pb-2 pr-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}></th>
+                  <th className="pb-2 pr-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Producto</th>
+                  <th className="pb-2 pr-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Precio</th>
+                  <th className="pb-2 pr-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Cant.</th>
+                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detailSale.items.map((item) => {
+                  const product = getProductById(item.productId)
+                  const img = product?.images?.[0]
+                  return (
+                    <tr key={item.productId} className="border-b" style={{ borderColor: 'var(--clr-border-subtle)' }}>
+                      <td className="py-2 pr-2">
+                        <div className="h-10 w-10 overflow-hidden rounded-lg border" style={{ borderColor: 'var(--clr-border)' }}>
+                          {img ? (
+                            <Img src={img} alt="" className="h-full w-full object-cover" skeleton="rounded-lg" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center" style={{ background: 'var(--clr-surface)' }}>
+                              <Package size={14} style={{ color: 'var(--clr-muted)' }} />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-2 pr-2" style={{ color: 'var(--clr-text)' }}>
+                        <p className="font-medium">{item.productName}</p>
+                        {product?.barcode && <code className="text-[10px]" style={{ color: 'var(--clr-muted)' }}>{product.barcode}</code>}
+                      </td>
+                      <td className="py-2 pr-2 text-right" style={{ color: 'var(--clr-muted-light)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)}</td>
+                      <td className="py-2 pr-2 text-right" style={{ color: 'var(--clr-muted-light)' }}>{item.quantity}</td>
+                      <td className="py-2 text-right font-semibold" style={{ color: 'var(--clr-text)' }}>{config.currency.symbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+
+            <div className="flex flex-col items-end gap-1 border-t pt-3" style={{ borderColor: 'var(--clr-border)' }}>
+              <div className="flex w-56 items-center justify-between text-[15px] font-bold">
+                <span style={{ color: 'var(--clr-text)' }}>Total</span>
+                <span style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{detailSale.total.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border px-4 py-2.5 text-[12px]" style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-surface)' }}>
+              <div className="flex items-center gap-4">
+                <div>
+                  <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Método de pago</span>
+                  <div className="mt-1"><PaymentTag method={detailSale.paymentMethod} /></div>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Estado</span>
+                  <div className="mt-1"><StatusBadge status={detailSale.status} /></div>
+                </div>
+              </div>
+              {detailSale.userId && (
+                <div className="text-right">
+                  <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Vendedor</span>
+                  <p className="mt-0.5 text-[12px] font-medium" style={{ color: 'var(--clr-text)' }}>{sellerName || 'Cargando...'}</p>
+                </div>
+              )}
+            </div>
+
+            <p className="text-[10px] text-center" style={{ color: 'var(--clr-muted)' }}>
+              {detailSale.items.length} producto{detailSale.items.length !== 1 ? 's' : ''} en esta venta
+            </p>
+          </div>
+        )}
+        <div className="mt-6 flex justify-end">
+          <Button variant="gold-outline" onClick={() => { setDetailModalOpen(false); setDetailSale(null) }}>Cerrar</Button>
+        </div>
+      </Modal>
+
+      {/* ── Modal Anular ── */}
+      <Modal open={voidConfirmOpen} onClose={() => { setVoidConfirmOpen(false); setSaleToVoid(null) }} title="Anular venta" size="sm">
         {saleToVoid && (
           <div className="space-y-4">
-            <div className="flex items-start gap-3 rounded-lg border border-danger-dim bg-danger-dim/30 p-3">
-              <AlertCircle size={18} className="mt-0.5 shrink-0 text-danger-text" />
-              <div className="text-[12px] text-muted">
-                <p className="font-semibold text-danger-text">¿Estás seguro de anular esta venta?</p>
-                <p className="mt-1">Se restaurará el stock de todos los productos incluidos en la venta #{saleToVoid.id.slice(-6).toUpperCase()}.</p>
+            <div
+              className="flex items-start gap-3 rounded-xl border p-3"
+              style={{ borderColor: 'var(--clr-danger)', background: 'var(--clr-danger-dim)' }}
+            >
+              <AlertCircle size={17} className="mt-0.5 shrink-0" style={{ color: 'var(--clr-danger-text)' }} />
+              <div className="text-[12px]" style={{ color: 'var(--clr-muted)' }}>
+                <p className="font-semibold" style={{ color: 'var(--clr-danger-text)' }}>¿Anular esta venta?</p>
+                <p className="mt-1">Se restaurará el stock de todos los productos de la venta #{saleToVoid.id.slice(-6).toUpperCase()}.</p>
                 <p className="mt-1">Esta acción no se puede deshacer.</p>
               </div>
             </div>
 
-            <div className="rounded-lg border border-border bg-surface p-3 space-y-1.5">
+            <div className="rounded-xl border p-3 space-y-1.5" style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-surface)' }}>
               {saleToVoid.items.map((item) => (
                 <div key={item.productId} className="flex items-center justify-between text-[12px]">
-                  <span className="text-text">{item.productName}</span>
-                  <span className="text-muted-light">x{item.quantity} → se restaura stock</span>
+                  <span style={{ color: 'var(--clr-text)' }}>{item.productName}</span>
+                  <span style={{ color: 'var(--clr-muted-light)' }}>x{item.quantity} → stock restaurado</span>
                 </div>
               ))}
             </div>
 
-            <div className="flex justify-end gap-3 border-t border-border pt-4">
+            <div className="flex justify-end gap-3 border-t pt-4" style={{ borderColor: 'var(--clr-border)' }}>
               <Button variant="gold-outline" onClick={() => { setVoidConfirmOpen(false); setSaleToVoid(null) }}>
                 Cancelar
               </Button>
               <Button variant="surface" onClick={handleVoidSale} disabled={voiding}>
-                <AlertCircle size={14} /> {voiding ? 'Anulando...' : 'Confirmar Anulación'}
+                <AlertCircle size={14} /> {voiding ? 'Anulando...' : 'Confirmar anulación'}
               </Button>
             </div>
           </div>
