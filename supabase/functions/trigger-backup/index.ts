@@ -85,12 +85,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return json({}, 204);
 
   try {
-    const cronSecret = Deno.env.get("CRON_SECRET");
-    const cronHeader = req.headers.get("x-cron-secret");
-    if (cronSecret && cronHeader !== cronSecret) {
-      return json({ error: "No autorizado" }, 401);
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!supabaseUrl || !serviceRoleKey) {
