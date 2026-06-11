@@ -1,0 +1,17 @@
+name: Backup Automático Diario
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  trigger-backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a Edge Function de backup
+        run: |
+          curl -sS -X POST "${{ secrets.SUPABASE_FUNCTION_URL }}/trigger-backup" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -w "\nHTTP_STATUS:%{http_code}"
