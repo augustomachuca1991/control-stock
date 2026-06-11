@@ -94,7 +94,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const start = Date.now();
 
-    const TABLES = ["products", "categories", "sales", "purchases", "invoices", "profiles"] as const;
+    const TABLES = ["products", "categories", "sales", "purchases", "invoices", "profiles", "roles", "user_roles", "bot_sessions"] as const;
     const STORAGE_BUCKETS = ["product-images", "avatars", "invoice-files", "backups"] as const;
     const dump: Record<string, unknown[]> = {};
 

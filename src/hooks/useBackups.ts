@@ -60,7 +60,7 @@ const mapRow = (row: BackupRow): Backup => ({
   createdAt: new Date(row.created_at).getTime(),
 })
 
-const TABLES = ['products', 'categories', 'sales', 'purchases', 'invoices', 'profiles'] as const
+const TABLES = ['products', 'categories', 'sales', 'purchases', 'invoices', 'profiles', 'roles', 'user_roles', 'bot_sessions'] as const
 
 const STORAGE_BUCKETS = ['product-images', 'avatars', 'invoice-files', 'backups'] as const
 
