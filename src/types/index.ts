@@ -106,3 +106,16 @@ export interface Backup {
   userEmail?: string
   createdAt: number
 }
+
+export interface UserItem {
+  id: string
+  email: string
+  fullName: string
+  phone: string
+  avatarUrl: string
+  role: string
+  roleId: string
+  createdAt: string
+  lastSignIn: string | null
+  isBlocked: boolean
+}

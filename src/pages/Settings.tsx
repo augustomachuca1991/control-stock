@@ -1,16 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Database, Download, Trash2, Upload, AlertTriangle, Loader2, FileText } from 'lucide-react'
+import { Database, Download, Trash2, Upload, AlertTriangle, Loader2, FileText, Users, Shield, ShieldOff, Ban, CheckCircle2 } from 'lucide-react'
 import { Badge } from '../components/ui/Badge'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { useBackups } from '../hooks/useBackups'
+import { useUsers } from '../hooks/useUsers'
+import { Img } from '../components/ui/Img'
+import { Select } from '../components/ui/Select'
 import { toast } from 'sonner'
 
-type Tab = 'profile' | 'backup'
+type Tab = 'users' | 'backup'
 
 export function Settings() {
   const { backups, loading: backupsLoading, creating, TABLES, STORAGE_BUCKETS, create: createBackup, remove, downloadBackup, restore } = useBackups()
+  const { users, roles, loading: usersLoading, updateRole, toggleBlock } = useUsers()
 
   const [activeTab, setActiveTab] = useState<Tab>('backup')
   const [selectedTables, setSelectedTables] = useState<string[]>([])
@@ -20,6 +24,9 @@ export function Settings() {
   const [dragOver, setDragOver] = useState(false)
   const [selectedRestoreFile, setSelectedRestoreFile] = useState<File | null>(null)
   const restoreInputRef = useRef<HTMLInputElement>(null)
+  const [editRoleUser, setEditRoleUser] = useState<{ id: string; fullName: string; roleId: string } | null>(null)
+  const [blockConfirm, setBlockConfirm] = useState<{ id: string; fullName: string; isBlocked: boolean } | null>(null)
+  const [updating, setUpdating] = useState(false)
 
   useEffect(() => {
     if (selectAll) setSelectedTables([])
@@ -86,14 +93,14 @@ export function Settings() {
     <div className="space-y-4">
       {/* Tabs */}
       <div className="flex gap-1 rounded-lg border border-border bg-surface p-1">
-        {/*  <button
-          onClick={() => setActiveTab('profile')}
+        <button
+          onClick={() => setActiveTab('users')}
           className={`flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-medium transition-colors ${
-            activeTab === 'profile' ? 'bg-primary-dim text-primary-light' : 'text-muted hover:text-text'
+            activeTab === 'users' ? 'bg-primary-dim text-primary-light' : 'text-muted hover:text-text'
           }`}
         >
-          <User size={15} /> Perfil
-        </button> */}
+          <Users size={15} /> Usuarios
+        </button>
         <button
           onClick={() => setActiveTab('backup')}
           className={`flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-medium transition-colors ${activeTab === 'backup' ? 'bg-primary-dim text-primary-light' : 'text-muted hover:text-text'
@@ -103,7 +110,202 @@ export function Settings() {
         </button>
       </div>
 
-      {/* Profile Tab */}
+      {/* Users Tab */}
+      {activeTab === 'users' && (
+        <>
+          <Card title="Usuarios del Sistema" subtitle={`${users.length} usuario${users.length !== 1 ? 's' : ''}`}>
+            {usersLoading ? (
+              <p className="py-4 text-center text-[13px] text-muted">Cargando...</p>
+            ) : users.length === 0 ? (
+              <p className="py-4 text-center text-[13px] text-muted">No hay usuarios</p>
+            ) : (
+              <>
+                {/* Desktop */}
+                <div className="hidden md:block">
+                  <table className="w-full text-left text-[12px]">
+                    <thead>
+                      <tr className="border-b border-border text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">
+                        <th className="pb-2 pr-2">Usuario</th>
+                        <th className="pb-2 pr-2">Email</th>
+                        <th className="pb-2 pr-2">Teléfono</th>
+                        <th className="pb-2 pr-2">Rol</th>
+                        <th className="pb-2 pr-2">Estado</th>
+                        <th className="pb-2 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((u) => (
+                        <tr key={u.id} className="border-b border-border/50">
+                          <td className="py-2 pr-2">
+                            <div className="flex items-center gap-2">
+                              {u.avatarUrl ? (
+                                <Img src={u.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" skeleton="rounded-full" />
+                              ) : (
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-dim text-[10px] font-bold text-primary-light">
+                                  {u.fullName.charAt(0).toUpperCase() || u.email.charAt(0).toUpperCase()}
+                                </span>
+                              )}
+                              <span className="font-medium text-text">{u.fullName || '—'}</span>
+                            </div>
+                          </td>
+                          <td className="py-2 pr-2 text-muted">{u.email}</td>
+                          <td className="py-2 pr-2 text-muted">{u.phone || '—'}</td>
+                          <td className="py-2 pr-2">
+                            <Badge variant={u.role === 'admin' ? 'info' : 'default'}>{u.role}</Badge>
+                          </td>
+                          <td className="py-2 pr-2">
+                            {u.isBlocked ? (
+                              <span className="flex items-center gap-1 text-[11px] text-danger-text">
+                                <Ban size={12} /> Bloqueado
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-[11px] text-success">
+                                <CheckCircle2 size={12} /> Activo
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="surface" size="sm" onClick={() => setEditRoleUser({
+                                id: u.id,
+                                fullName: u.fullName || u.email,
+                                roleId: u.roleId,
+                              })} title="Cambiar rol">
+                                <Shield size={13} className="text-muted-light" />
+                              </Button>
+                              <Button variant="surface" size="sm" onClick={() => setBlockConfirm({
+                                id: u.id,
+                                fullName: u.fullName || u.email,
+                                isBlocked: u.isBlocked,
+                              })} title={u.isBlocked ? 'Desbloquear' : 'Bloquear'}>
+                                {u.isBlocked ? (
+                                  <ShieldOff size={13} className="text-success" />
+                                ) : (
+                                  <Ban size={13} className="text-danger-text" />
+                                )}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile */}
+                <div className="space-y-2 md:hidden">
+                  {users.map((u) => (
+                    <div key={u.id} className="rounded-lg border border-border bg-surface p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {u.avatarUrl ? (
+                            <Img src={u.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" skeleton="rounded-full" />
+                          ) : (
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-dim text-[11px] font-bold text-primary-light">
+                              {u.fullName.charAt(0).toUpperCase() || u.email.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                          <div className="min-w-0">
+                            <p className="truncate text-[13px] font-medium text-text">{u.fullName || '—'}</p>
+                            <p className="truncate text-[11px] text-muted">{u.email}</p>
+                          </div>
+                        </div>
+                        <Badge variant={u.role === 'admin' ? 'info' : 'default'}>{u.role}</Badge>
+                      </div>
+                      <div className="mt-2 flex items-center gap-3 text-[11px] text-muted">
+                        <span>{u.phone || '—'}</span>
+                        {u.isBlocked && (
+                          <span className="flex items-center gap-1 text-danger-text">
+                            <Ban size={11} /> Bloqueado
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex gap-1">
+                        <Button variant="surface" size="sm" onClick={() => setEditRoleUser({
+                          id: u.id,
+                          fullName: u.fullName || u.email,
+                          roleId: u.roleId,
+                        })}>
+                          <Shield size={12} className="text-muted-light" /> Rol
+                        </Button>
+                        <Button variant="surface" size="sm" onClick={() => setBlockConfirm({
+                          id: u.id,
+                          fullName: u.fullName || u.email,
+                          isBlocked: u.isBlocked,
+                        })}>
+                          {u.isBlocked ? (
+                            <><ShieldOff size={12} className="text-success" /> Desbloquear</>
+                          ) : (
+                            <><Ban size={12} className="text-danger-text" /> Bloquear</>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </Card>
+
+          {/* Modal cambiar rol */}
+          <Modal open={!!editRoleUser} onClose={() => setEditRoleUser(null)} title="Cambiar Rol" size="sm">
+            {editRoleUser && (
+              <div className="space-y-4">
+                <p className="text-[13px] text-muted-light">
+                  Cambiar rol de <strong className="text-text">{editRoleUser.fullName}</strong>
+                </p>
+                <Select
+                  value={editRoleUser.roleId}
+                  onChange={(e) => setEditRoleUser({ ...editRoleUser, roleId: e.target.value })}
+                  options={roles.map((r) => ({ value: r.id, label: r.name }))}
+                  placeholder="Seleccionar rol"
+                />
+                <div className="flex justify-end gap-3">
+                  <Button variant="gold-outline" onClick={() => setEditRoleUser(null)}>Cancelar</Button>
+                  <Button variant="gold" disabled={updating} onClick={async () => {
+                    setUpdating(true)
+                    const ok = await updateRole(editRoleUser.id, editRoleUser.roleId)
+                    setUpdating(false)
+                    if (ok) toast.success('Rol actualizado')
+                    else toast.error('Error al actualizar rol')
+                    setEditRoleUser(null)
+                  }}>
+                    {updating ? 'Guardando...' : 'Guardar'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Modal>
+
+          {/* Modal confirmar bloqueo */}
+          <Modal open={!!blockConfirm} onClose={() => setBlockConfirm(null)} title={blockConfirm?.isBlocked ? 'Desbloquear Usuario' : 'Bloquear Usuario'} size="sm">
+            {blockConfirm && (
+              <div className="space-y-4">
+                <p className="text-[13px] text-muted-light">
+                  {blockConfirm.isBlocked
+                    ? `¿Desbloquear a ${blockConfirm.fullName}?`
+                    : `¿Bloquear a ${blockConfirm.fullName}? No podrá iniciar sesión.`}
+                </p>
+                <div className="flex justify-end gap-3">
+                  <Button variant="gold-outline" onClick={() => setBlockConfirm(null)}>Cancelar</Button>
+                  <Button variant="surface" disabled={updating}
+                    style={blockConfirm.isBlocked ? {} : { background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}
+                    onClick={async () => {
+                      setUpdating(true)
+                      const ok = await toggleBlock(blockConfirm.id)
+                      setUpdating(false)
+                      if (ok) toast.success(blockConfirm.isBlocked ? 'Usuario desbloqueado' : 'Usuario bloqueado')
+                      else toast.error('Error al cambiar estado')
+                      setBlockConfirm(null)
+                    }}>
+                    {updating ? 'Procesando...' : (blockConfirm.isBlocked ? 'Desbloquear' : 'Bloquear')}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Modal>
+        </>
+      )}
 
       {/* Backup Tab */}
       {activeTab === 'backup' && (
