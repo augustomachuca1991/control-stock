@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Package, ShoppingCart, DollarSign, AlertTriangle, type LucideIcon } from 'lucide-react'
+import { Package, ShoppingCart, DollarSign, AlertTriangle, CheckCircle, type LucideIcon } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
@@ -145,11 +145,10 @@ export function Dashboard() {
 
   return (
     <div className="space-y-4">
-      {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* ── Row 1: KPIs principales ── */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {loading ? (
           <>
-            <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
@@ -159,13 +158,77 @@ export function Dashboard() {
             <StatCard icon={Package} label="Total productos" value={stats.totalProducts} accent="primary" />
             <StatCard icon={DollarSign} label="Ingresos totales" value={`${config.currency.symbol}${stats.revenue.toFixed(2)}`} accent="accent" />
             <StatCard icon={ShoppingCart} label="Ventas realizadas" value={stats.totalSales} accent="success" />
-            <StatCard icon={AlertTriangle} label="Stock bajo" value={stats.lowStockCount} accent="danger" />
           </>
         )}
       </div>
 
-      {/* Tablas */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* ── Row 2: Alerta de stock bajo (full-width) ── */}
+      {loading ? (
+        <SkeletonCard />
+      ) : stats.lowStockCount > 0 ? (
+        <div className="flex items-center gap-3 rounded-[10px] border border-danger/30 bg-danger/5 p-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-danger">
+            <AlertTriangle size={16} color="white" />
+          </div>
+          <div>
+            <p className="text-[13px] font-semibold text-danger-text">
+              {stats.lowStockCount} producto{stats.lowStockCount !== 1 ? 's' : ''} con stock bajo
+            </p>
+            <p className="text-[11px] text-muted">Revisá la sección de Stock Crítico para reponer</p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 rounded-[10px] border border-success/30 bg-success/5 p-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success">
+            <CheckCircle size={16} color="white" />
+          </div>
+          <p className="text-[13px] font-semibold text-success-text">Todo el stock está en orden</p>
+        </div>
+      )}
+
+      {/* ── Row 3: Bento — Stock Crítico (2/3) + Últimas Ventas (1/3) ── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 items-start">
+        <Card
+          title="Stock crítico"
+          subtitle={lowStock.length > 0 ? `${lowStock.length} producto${lowStock.length !== 1 ? 's' : ''} bajo mínimo` : undefined}
+          className="lg:col-span-2"
+        >
+          {loading ? (
+            <div className="divide-y divide-border/50">
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </div>
+          ) : lowStock.length === 0 ? (
+            <p className="py-4 text-center text-[13px] text-muted">
+              No hay productos con stock bajo
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {lowStock.map((p) => {
+                const maxStock = p.minStock * 3
+                return (
+                  <div key={p.id} className="rounded-lg border border-border bg-surface p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-semibold text-text">{p.name}</p>
+                        <p className="text-[10px] text-muted">{getCategoryById(p.categoryId)?.name || '—'}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-[15px] font-bold text-danger-text">{p.stock} uds.</p>
+                        <p className="text-[10px] text-muted">Mín: {p.minStock}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <StockBar current={p.stock} min={p.minStock} max={maxStock} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+
         <Card title="Últimas ventas" actions={
           <span className="text-[10px] text-primary-light cursor-pointer hover:text-primary transition-colors">
             Ver todas →
@@ -184,38 +247,6 @@ export function Dashboard() {
               keyExtractor={(s) => s.id}
               emptyMessage="No hay ventas registradas"
             />
-          )}
-        </Card>
-
-        <Card
-          title="Stock crítico"
-          subtitle={lowStock.length > 0 ? `${lowStock.length} producto${lowStock.length !== 1 ? 's' : ''} bajo mínimo` : undefined}
-        >
-          {lowStock.length === 0 ? (
-            <p className="py-4 text-center text-[13px] text-muted">
-              Todo el stock está en orden ✓
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {lowStock.map((p) => {
-                const maxStock = p.minStock * 3
-                return (
-                  <div key={p.id} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-[12px] font-medium text-text">{p.name}</p>
-                        <p className="text-[10px] text-muted">{getCategoryById(p.categoryId)?.name}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[13px] font-bold text-danger-text">{p.stock} uds.</p>
-                        <p className="text-[10px] text-muted">Mín: {p.minStock}</p>
-                      </div>
-                    </div>
-                    <StockBar current={p.stock} min={p.minStock} max={maxStock} />
-                  </div>
-                )
-              })}
-            </div>
           )}
         </Card>
       </div>
