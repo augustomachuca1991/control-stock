@@ -66,6 +66,20 @@ export function Settings() {
     return `${(ms / 1000).toFixed(1)} s`
   }
 
+  const getNextBackup = () => {
+    const now = new Date()
+    const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 3, 0, 0, 0))
+    if (now >= next) next.setUTCDate(next.getUTCDate() + 1)
+    return next.toLocaleDateString('es-AR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'America/Argentina/Buenos_Aires',
+    })
+  }
+
   const lastBackup = backups[0]
 
   return (
@@ -111,7 +125,7 @@ export function Settings() {
               </div>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Próximo Programado</p>
-                <p className="mt-1 text-[13px] font-medium text-text">—</p>
+                <p className="mt-1 text-[13px] font-medium text-text">{getNextBackup()}</p>
               </div>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">Total de backups</p>
