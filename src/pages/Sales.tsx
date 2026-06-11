@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import { Formik, Form } from 'formik'
 import type { FormikProps } from 'formik'
 import { Plus, Minus, Trash2, FileText, AlertCircle, ShoppingCart } from 'lucide-react'
@@ -11,6 +11,7 @@ import { Input } from '../components/ui/Input'
 import { SelectField } from '../components/ui/SelectField'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
+import { SkeletonRow } from '../components/ui/Skeleton'
 import { useProductStore } from '../stores/useProductStore'
 import { useSaleStore } from '../stores/useSaleStore'
 import { useSales } from '../hooks/useSales'
@@ -42,13 +43,9 @@ export function Sales() {
   const removeFromCart = useSaleStore((s) => s.removeFromCart)
   const clearCart = useSaleStore((s) => s.clearCart)
   const getProductById = useProductStore((s) => s.getProductById)
-  const { create: createSale, voidSale } = useSales()
-  const { reduceStock, increaseStock } = useProducts()
-
-  // Auto-abrir el modal si hay items en el carrito al volver a la página
-  useEffect(() => {
-    if (cart.length > 0) setModalOpen(true)
-  }, [cart.length])
+  const { create: createSale, voidSale, loading: salesLoading } = useSales()
+  const { reduceStock, increaseStock, loading: productsLoading } = useProducts()
+  const loading = salesLoading || productsLoading
 
   const openCreate = useCallback(() => {
     setSelectedProductId('')
@@ -217,6 +214,15 @@ export function Sales() {
         subtitle={`${sales.length} venta${sales.length !== 1 ? 's' : ''} registradas`}
         actions={cart.length === 0 && <Button variant="gold" size="sm" onClick={openCreate}><Plus size={16} /> Nueva Venta</Button>}
       >
+        {loading ? (
+          <div className="divide-y divide-border/50 rounded-lg border border-border">
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+          </div>
+        ) : (
         <Table
           columns={saleColumns}
           data={sales}
@@ -231,15 +237,14 @@ export function Sales() {
                   <Badge variant={paymentVariants[s.paymentMethod]}>{paymentLabels[s.paymentMethod]}</Badge>
                 </div>
               </div>
-              <div className={`text-[12px] ${s.status === 'voided' ? 'line-through text-muted' : 'text-muted'}`}>
-                {s.items.map((i) => `${i.productName} x${i.quantity}`).join(', ')}
-              </div>
-              <div className="flex items-center justify-between border-t border-border pt-2">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-[12px] text-muted">{new Date(s.createdAt).toLocaleDateString('es-ES', { dateStyle: 'medium' })}</span>
-                  {s.status === 'active' && (
+                  <span className="text-[13px] text-muted">{new Date(s.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  {s.status !== 'voided' && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); setSaleToVoid(s); setVoidConfirmOpen(true) }}
+                      onClick={() => {
+                        setSaleToVoid(s); setVoidConfirmOpen(true)
+                      }}
                       className="text-[11px] text-danger-text hover:underline"
                     >
                       Anular
@@ -251,6 +256,7 @@ export function Sales() {
             </div>
           )}
         />
+        )}
       </Card>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nueva Venta" size="lg">

@@ -3,6 +3,7 @@ import { Package, ShoppingCart, DollarSign, AlertTriangle, type LucideIcon } fro
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
+import { SkeletonCard, SkeletonRow } from '../components/ui/Skeleton'
 import { useProductStore } from '../stores/useProductStore'
 import { useSaleStore } from '../stores/useSaleStore'
 import { useCategoryStore } from '../stores/useCategoryStore'
@@ -75,9 +76,10 @@ function StockBar({ current, min, max }: { current: number; min: number; max: nu
 
 /* ── Dashboard ── */
 export function Dashboard() {
-  useProducts()
-  useSales()
+  const { loading: loadingProducts } = useProducts()
+  const { loading: loadingSales } = useSales()
   useCategories()
+  const loading = loadingProducts || loadingSales
 
   const products        = useProductStore((s) => s.products)
   const lowStock        = useMemo(() => products.filter((p) => p.stock <= p.minStock), [products])
@@ -145,35 +147,21 @@ export function Dashboard() {
     <div className="space-y-4">
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          icon={Package}
-          label="Total productos"
-          value={stats.totalProducts}
-          trend="+2 nuevos"
-          accent="primary"
-        />
-        <StatCard
-          icon={DollarSign}
-          label="Ingresos totales"
-          value={`${config.currency.symbol}${stats.revenue.toFixed(2)}`}
-          trend="+15,3%"
-          accent="accent"
-        />
-        <StatCard
-          icon={ShoppingCart}
-          label="Ventas realizadas"
-          value={stats.totalSales}
-          trend="+11,8%"
-          accent="success"
-        />
-        <StatCard
-          icon={AlertTriangle}
-          label="Stock bajo"
-          value={stats.lowStockCount}
-          trend="Requiere atención"
-          trendUp={false}
-          accent="danger"
-        />
+        {loading ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : (
+          <>
+            <StatCard icon={Package} label="Total productos" value={stats.totalProducts} accent="primary" />
+            <StatCard icon={DollarSign} label="Ingresos totales" value={`${config.currency.symbol}${stats.revenue.toFixed(2)}`} accent="accent" />
+            <StatCard icon={ShoppingCart} label="Ventas realizadas" value={stats.totalSales} accent="success" />
+            <StatCard icon={AlertTriangle} label="Stock bajo" value={stats.lowStockCount} accent="danger" />
+          </>
+        )}
       </div>
 
       {/* Tablas */}
@@ -183,12 +171,20 @@ export function Dashboard() {
             Ver todas →
           </span>
         }>
-          <Table
-            columns={saleColumns}
-            data={recentSales}
-            keyExtractor={(s) => s.id}
-            emptyMessage="No hay ventas registradas"
-          />
+          {loading ? (
+            <div className="divide-y divide-border/50">
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </div>
+          ) : (
+            <Table
+              columns={saleColumns}
+              data={recentSales}
+              keyExtractor={(s) => s.id}
+              emptyMessage="No hay ventas registradas"
+            />
+          )}
         </Card>
 
         <Card

@@ -265,3 +265,22 @@ create policy "auth_backups_files_delete"
   on storage.objects for delete using (
     bucket_id = 'backups' and auth.role() = 'authenticated'
   );
+
+create table bot_sessions (
+  id         uuid primary key default gen_random_uuid(),
+  chat_id    bigint not null,
+  data       jsonb not null default '{}',
+  status     text not null default 'waiting_category',
+  created_at timestamptz not null default now()
+);
+
+alter table bot_sessions enable row level security;
+
+create policy "service_bot_sessions_all" on bot_sessions
+  using (true) with check (true);
+
+create or replace function delete_old_bot_sessions()
+returns void language sql as $$
+  delete from bot_sessions
+  where created_at < now() - interval '1 hour';
+$$;

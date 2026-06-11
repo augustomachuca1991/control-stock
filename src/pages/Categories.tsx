@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
+import { SkeletonCard } from '../components/ui/Skeleton'
 import { Field } from '../components/ui/Field'
 import { useCategoryStore } from '../stores/useCategoryStore'
 import { useCategories } from '../hooks/useCategories'
@@ -16,7 +17,7 @@ export function Categories() {
   const [saving, setSaving] = useState(false)
 
   const categories = useCategoryStore((s) => s.categories)
-  const { add: addCategory, update: updateCategory, delete: deleteCategory } = useCategories()
+  const { add: addCategory, update: updateCategory, delete: deleteCategory, loading } = useCategories()
 
   const openCreate = useCallback(() => {
     setEditingId(null)
@@ -37,7 +38,13 @@ export function Categories() {
         subtitle={`${categories.length} categoría${categories.length !== 1 ? 's' : ''}`}
         actions={<Button variant="gold" size="sm" onClick={openCreate}><Plus size={16} /> Nueva</Button>}
       >
-        {categories.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : categories.length === 0 ? (
           <p className="py-6 text-center text-[13px] text-muted">No hay categorías. Creá la primera.</p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -9,6 +9,7 @@ import { Badge } from '../components/ui/Badge'
 import { Modal } from '../components/ui/Modal'
 import { Field } from '../components/ui/Field'
 import { SelectField } from '../components/ui/SelectField'
+import { SkeletonRow } from '../components/ui/Skeleton'
 import { useProductStore } from '../stores/useProductStore'
 import { useCategoryStore } from '../stores/useCategoryStore'
 import { usePurchaseStore } from '../stores/usePurchaseStore'
@@ -47,7 +48,9 @@ export function Purchases() {
   const categories = useCategoryStore((s) => s.categories)
   const purchases = usePurchaseStore((s) => s.purchases)
   const { add: addProduct, increaseStock, update: updateProduct } = useProducts()
-  const { add: addPurchase } = usePurchases()
+  const { add: addPurchase, loading: purchasesLoading } = usePurchases()
+  const { loading: productsLoading } = useProducts()
+  const loading = purchasesLoading || productsLoading
 
   const catOptions = categories.map((c) => ({ value: c.id, label: c.name }))
 
@@ -358,7 +361,15 @@ export function Purchases() {
         </Card>
       ) : (
         <Card title="Historial de Compras" subtitle={`${purchases.length} compra${purchases.length !== 1 ? 's' : ''} registradas`}>
-          {purchases.length === 0 ? (
+          {loading ? (
+            <div className="divide-y divide-border/50 rounded-lg border border-border">
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </div>
+          ) : purchases.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 text-muted">
               <Package size={36} className="opacity-40" />
               <p className="text-[13px]">No hay compras registradas todavía</p>

@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Img } from '../components/ui/Img'
 import { Modal } from '../components/ui/Modal'
+import { SkeletonRow } from '../components/ui/Skeleton'
 import { config } from '../config'
 import { toast } from 'sonner'
 import { Select } from '../components/ui/Select'
@@ -49,7 +50,7 @@ export function Invoices() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const { products, add: addProduct, update: updateProduct, increaseStock } = useProducts()
   const { add: addPurchase } = usePurchases()
-  const { invoices, add: addInvoice } = useInvoices()
+  const { invoices, add: addInvoice, loading: invoicesLoading } = useInvoices()
   const categories = useCategoryStore((s) => s.categories)
   const inputRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
@@ -505,7 +506,15 @@ export function Invoices() {
 
       {/* Historial */}
       <Card title="Historial" subtitle="Facturas procesadas">
-        {invoices.length === 0 ? (
+        {invoicesLoading ? (
+          <div className="divide-y divide-border/50 rounded-lg border border-border">
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+          </div>
+        ) : invoices.length === 0 ? (
           <p className="py-6 text-center text-[13px] text-muted">Todavía no se procesaron facturas</p>
         ) : (
           <div className="space-y-3">

@@ -7,6 +7,7 @@ import { Input } from '../components/ui/Input'
 import { Modal } from '../components/ui/Modal'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
+import { SkeletonRow } from '../components/ui/Skeleton'
 import { Img } from '../components/ui/Img'
 import { Field } from '../components/ui/Field'
 import { SelectField } from '../components/ui/SelectField'
@@ -59,7 +60,7 @@ export function Products() {
   useCategories()
   const products = useProductStore((s) => s.products)
   const getProductById = useProductStore((s) => s.getProductById)
-  const { uploadImage, add: addProduct, update: updateProduct, delete: deleteProduct } = useProducts()
+  const { uploadImage, add: addProduct, update: updateProduct, delete: deleteProduct, loading: productsLoading } = useProducts()
   const categories = useCategoryStore((s) => s.categories)
 
   const catOptions = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories])
@@ -167,6 +168,15 @@ export function Products() {
           </div>
         </div>
 
+        {productsLoading ? (
+          <div className="divide-y divide-border/50 rounded-lg border border-border">
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+          </div>
+        ) : (
         <Table
           columns={columns}
           data={filtered}
@@ -201,6 +211,7 @@ export function Products() {
             </div>
           )}
         />
+        )}
       </Card>
 
       {/* Modal formulario */}
