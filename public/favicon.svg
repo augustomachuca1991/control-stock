@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 54 48">
-  <rect width="54" height="48" rx="8" fill="#131313"/>
-  <text x="0" y="38" font-family="'Playfair Display','Times New Roman',serif" font-size="40" font-weight="900" fill="#C9A84C">M</text>
-  <text x="28" y="38" font-family="'Playfair Display','Times New Roman',serif" font-size="40" font-weight="900" fill="#F0E8D0">E</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <rect width="48" height="48" rx="8" fill="#131313"/>
+  <text x="4" y="31" font-family="'Playfair Display','Times New Roman',serif" font-size="24" font-weight="900" fill="#C9A84C">M</text>
+  <text x="21" y="31" font-family="'Playfair Display','Times New Roman',serif" font-size="24" font-weight="900" fill="#F0E8D0">E</text>
 </svg>

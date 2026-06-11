@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from 'react'
 import { Formik, Form } from 'formik'
-import { Plus, Pencil, Search, Image as ImageIcon, X, ChevronRight, Upload } from 'lucide-react'
+import { Plus, Pencil, Search, Image as ImageIcon, X, ChevronRight, Upload, MessageCircle } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -145,7 +145,12 @@ export function Products() {
       <Card
         title="Productos"
         subtitle={`${filtered.length} producto${filtered.length !== 1 ? 's' : ''}`}
-        actions={<Button variant="gold" size="sm" onClick={openCreate}><Plus size={16} /> Nuevo</Button>}
+        actions={<div className="flex gap-2">
+          <a href="https://t.me/marely_productos_bot" target="_blank" rel="noopener noreferrer">
+            <Button variant="surface" size="sm"><MessageCircle size={16} /> Alta por IA</Button>
+          </a>
+          <Button variant="gold" size="sm" onClick={openCreate}><Plus size={16} /> Nuevo</Button>
+        </div>}
       >
         <div className="mb-4 flex flex-wrap gap-3">
           <div className="min-w-0 flex-1">
