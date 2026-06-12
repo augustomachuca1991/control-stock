@@ -2,17 +2,13 @@
 
 declare module 'virtual:pwa-register/react' {
   import type { Dispatch, SetStateAction } from 'react'
+  import type { RegisterSWOptions } from 'vite-plugin-pwa/types'
 
-  interface RegisterSWOptions {
-    onNeedRefresh?: () => void
-    onOfflineReady?: () => void
-    onRegistered?: (registration: ServiceWorkerRegistration | undefined) => void
-    onRegisterError?: (error: unknown) => void
-  }
+  export type { RegisterSWOptions }
 
   export function useRegisterSW(options?: RegisterSWOptions): {
-    needRefresh: boolean
-    offlineReady: boolean
+    needRefresh: [boolean, Dispatch<SetStateAction<boolean>>]
+    offlineReady: [boolean, Dispatch<SetStateAction<boolean>>]
     updateServiceWorker: (reloadPage?: boolean) => Promise<void>
   }
 }
