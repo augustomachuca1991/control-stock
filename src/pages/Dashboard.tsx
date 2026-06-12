@@ -1,13 +1,10 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Package, ShoppingCart, DollarSign, AlertTriangle, CheckCircle, Plus, ChevronLeft, ChevronRight, ArrowUpRight, type LucideIcon } from 'lucide-react'
+import { Package, ShoppingCart, DollarSign, AlertTriangle, CheckCircle, ArrowUpRight, type LucideIcon } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
 import { SkeletonCard, SkeletonRow } from '../components/ui/Skeleton'
-import { SearchSelect } from '../components/ui/SearchSelect'
-import { Input } from '../components/ui/Input'
-import { Button } from '../components/ui/Button'
 import { useProductStore } from '../stores/useProductStore'
 import { useSaleStore } from '../stores/useSaleStore'
 import { useCategoryStore } from '../stores/useCategoryStore'
@@ -16,7 +13,6 @@ import { useSales } from '../hooks/useSales'
 import { useCategories } from '../hooks/useCategories'
 import type { Sale } from '../types'
 import { config } from '../config'
-import { toast } from 'sonner'
 
 /* ── Colores de acento por KPI ── */
 type AccentColor = 'primary' | 'accent' | 'success' | 'danger'
@@ -87,67 +83,6 @@ export function Dashboard() {
   const revenue = useSaleStore((s) => s.getTotalRevenue())
   const sales = useSaleStore((s) => s.sales)
   const getCategoryById = useCategoryStore((s) => s.getCategoryById)
-  const cart = useSaleStore((s) => s.cart)
-  const addToCartStore = useSaleStore((s) => s.addToCart)
-  const getProductById = useProductStore((s) => s.getProductById)
-
-  const [selectedProductId, setSelectedProductId] = useState('')
-  const [addQty, setAddQty] = useState('1')
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
-
-  const saleable = useMemo(() => products.filter(p => p.enabled && p.stock > 0), [products])
-
-  const productOptions = useMemo(() =>
-    saleable.map(p => ({
-      value: p.id,
-      label: `${p.name}${p.brand ? ` (${p.brand})` : ''} — ${config.currency.symbol}${p.price.toFixed(2)} · ${p.stock} uds.`,
-    })), [saleable])
-
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(saleable.length / itemsPerPage)), [saleable.length])
-
-  const paginatedProducts = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage
-    return saleable.slice(start, start + itemsPerPage)
-  }, [saleable, currentPage])
-
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages)
-  }, [totalPages, currentPage])
-
-  const cartProductIds = useMemo(() => new Set(cart.map(c => c.productId)), [cart])
-
-  const addToCart = useCallback((productId: string, qty: number = 1) => {
-    const product = getProductById(productId)
-    if (!product || qty <= 0) return
-    if (product.stock <= 0) {
-      toast.error(`${product.name} no tiene stock disponible`)
-      return
-    }
-    const existing = cart.find(c => c.productId === productId)
-    const currentCartQty = existing ? existing.quantity : 0
-    const available = product.stock - currentCartQty
-    if (available <= 0) {
-      toast.error(`Stock insuficiente de ${product.name}`)
-      return
-    }
-    const q = Math.min(qty, available)
-    addToCartStore({
-      productId: product.id,
-      productName: product.name,
-      quantity: existing ? existing.quantity + q : q,
-      unitPrice: product.price,
-      maxStock: product.stock,
-    })
-    toast.success(`${q} × ${product.name} agregado al carrito`)
-  }, [getProductById, cart, addToCartStore])
-
-  const handleQuickAdd = useCallback(() => {
-    if (!selectedProductId) return
-    addToCart(selectedProductId, parseInt(addQty, 10) || 1)
-    setSelectedProductId('')
-    setAddQty('1')
-  }, [selectedProductId, addQty, addToCart])
 
   const stats = useMemo(() => ({
     totalProducts: products.length,
