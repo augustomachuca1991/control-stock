@@ -1,6 +1,7 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Formik, Form } from 'formik'
-import { Trash2, Package, FileText, Check, History, ShoppingCart } from 'lucide-react'
+import { Trash2, Package, FileText, Check, History, ShoppingCart, AlertTriangle, ChevronLeft, ChevronRight, Download, Mail } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -18,6 +19,7 @@ import { usePurchases } from '../hooks/usePurchases'
 import { purchaseEntrySchema } from '../lib/validation'
 import type { PurchaseItem as PurchaseItemType } from '../types'
 import { config } from '../config'
+import { toast } from 'sonner'
 
 interface Entry {
   tempId: string
@@ -33,7 +35,9 @@ interface Entry {
 }
 
 export function Purchases() {
-  const [tab, setTab] = useState<'new' | 'history'>('history')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlTab = searchParams.get('tab') as 'new' | 'history' | 'reorder' | null
+  const [tab, setTab] = useState<'new' | 'history' | 'reorder'>(urlTab || 'history')
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0])
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -44,13 +48,41 @@ export function Purchases() {
   const [selectedProductId, setSelectedProductId] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Reorder pagination
+  const [reorderPage, setReorderPage] = useState(1)
+  const reorderPerPage = 10
+
+  useEffect(() => {
+    if (urlTab && urlTab !== tab) setTab(urlTab)
+  }, [urlTab])
+
   const products = useProductStore((s) => s.products)
   const categories = useCategoryStore((s) => s.categories)
   const purchases = usePurchaseStore((s) => s.purchases)
+  const getCategoryById = useCategoryStore((s) => s.getCategoryById)
   const { add: addProduct, increaseStock, update: updateProduct } = useProducts()
   const { add: addPurchase, loading: purchasesLoading } = usePurchases()
   const { loading: productsLoading } = useProducts()
   const loading = purchasesLoading || productsLoading
+
+  const lowStockProducts = useMemo(() =>
+    products.filter((p) => p.enabled && p.stock <= p.minStock),
+    [products]
+  )
+
+  const reorderTotalPages = useMemo(() =>
+    Math.max(1, Math.ceil(lowStockProducts.length / reorderPerPage)),
+    [lowStockProducts.length]
+  )
+
+  const paginatedReorder = useMemo(() => {
+    const start = (reorderPage - 1) * reorderPerPage
+    return lowStockProducts.slice(start, start + reorderPerPage)
+  }, [lowStockProducts, reorderPage])
+
+  useEffect(() => {
+    if (reorderPage > reorderTotalPages) setReorderPage(reorderTotalPages)
+  }, [reorderTotalPages, reorderPage])
 
   const catOptions = categories.map((c) => ({ value: c.id, label: c.name }))
 
@@ -178,13 +210,57 @@ export function Purchases() {
 
   const canPreview = entries.length > 0
 
+  const handleTabChange = useCallback((t: 'new' | 'history' | 'reorder') => {
+    setTab(t)
+    setSearchParams(t === 'history' ? {} : { tab: t })
+  }, [setSearchParams])
+
+  const handleDownloadCSV = useCallback(() => {
+    if (lowStockProducts.length === 0) return
+    const sep = ';'
+    const rows = [
+      ['Producto', 'Marca', 'Stock', 'Mínimo', 'Déficit', 'Categoría'].join(sep),
+      ...lowStockProducts.map(p =>
+        [
+          `"${p.name}"`,
+          `"${p.brand || ''}"`,
+          p.stock,
+          p.minStock,
+          Math.max(0, p.minStock - p.stock),
+          `"${getCategoryById(p.categoryId)?.name || ''}"`,
+        ].join(sep)
+      ),
+    ].join('\n')
+    const bom = '\uFEFF'
+    const blob = new Blob([bom + rows], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `productos_por_reponer_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('CSV descargado')
+  }, [lowStockProducts, getCategoryById])
+
+  const handleSendMail = useCallback(() => {
+    if (lowStockProducts.length === 0) return
+    const lines = lowStockProducts.map((p, i) => {
+      const deficit = Math.max(0, p.minStock - p.stock)
+      return `${i + 1}. ${p.name}${p.brand ? ` (${p.brand})` : ''} — Stock: ${p.stock} uds. — Mín: ${p.minStock} uds. — Déficit: ${deficit} uds.`
+    })
+    const subject = encodeURIComponent('Lista de productos por reponer')
+    const body = encodeURIComponent(
+      `Productos con stock bajo al ${new Date().toLocaleDateString('es-AR')}:\n\n${lines.join('\n')}\n\n---\nGenerado por Control de Stock`
+    )
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank')
+  }, [lowStockProducts])
+
   return (
     <div className="space-y-6">
       {/* Tabs */}
       <div className="flex gap-1 rounded-lg border border-border bg-surface p-1 w-fit">
-
         <button
-          onClick={() => setTab('history')}
+          onClick={() => handleTabChange('history')}
           className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${tab === 'history'
             ? 'bg-primary-dim text-primary-light'
             : 'text-muted hover:text-muted-light'
@@ -193,7 +269,16 @@ export function Purchases() {
           <History size={14} /> Historial ({purchases.length})
         </button>
         <button
-          onClick={() => setTab('new')}
+          onClick={() => handleTabChange('reorder')}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${tab === 'reorder'
+            ? 'bg-primary-dim text-primary-light'
+            : 'text-muted hover:text-muted-light'
+            }`}
+        >
+          <AlertTriangle size={14} /> Por Reponer ({lowStockProducts.length})
+        </button>
+        <button
+          onClick={() => handleTabChange('new')}
           className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${tab === 'new'
             ? 'bg-primary-dim text-primary-light'
             : 'text-muted hover:text-muted-light'
@@ -202,6 +287,134 @@ export function Purchases() {
           <Package size={14} /> Nuevo Ingreso
         </button>
       </div>
+
+      {tab === 'reorder' && (
+        <Card
+          title="Productos por Reponer"
+          subtitle={`${lowStockProducts.length} producto${lowStockProducts.length !== 1 ? 's' : ''} con stock bajo`}
+          actions={
+            <div className="flex items-center gap-2">
+              <Button variant="surface" size="sm" onClick={handleDownloadCSV} disabled={lowStockProducts.length === 0}>
+                <Download size={13} /> CSV
+              </Button>
+              <Button variant="surface" size="sm" onClick={handleSendMail} disabled={lowStockProducts.length === 0}>
+                <Mail size={13} /> Enviar por correo
+              </Button>
+            </div>
+          }
+        >
+          {lowStockProducts.length === 0 ? (
+            <p className="py-8 text-center text-[13px] text-muted">No hay productos con stock bajo</p>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block">
+                <table className="w-full text-left text-[12px]">
+                  <thead>
+                    <tr className="border-b border-border text-[10px] font-semibold uppercase tracking-[0.6px] text-muted">
+                      <th className="pb-2 pr-2">Producto</th>
+                      <th className="pb-2 pr-2">Stock</th>
+                      <th className="pb-2 pr-2">Mínimo</th>
+                      <th className="pb-2 pr-2">Déficit</th>
+                      <th className="pb-2 pr-2">Categoría</th>
+                      <th className="pb-2 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedReorder.map((p) => {
+                      const deficit = Math.max(0, p.minStock - p.stock)
+                      return (
+                        <tr key={p.id} className="border-b border-border/50">
+                          <td className="py-2 pr-2">
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-text">{p.name}</p>
+                              {p.brand && <p className="text-[10px] text-muted">{p.brand}</p>}
+                            </div>
+                          </td>
+                          <td className="py-2 pr-2 text-muted-light">{p.stock} uds.</td>
+                          <td className="py-2 pr-2 text-muted-light">{p.minStock} uds.</td>
+                          <td className="py-2 pr-2">
+                            <span className="font-semibold text-danger-text">-{deficit} uds.</span>
+                          </td>
+                          <td className="py-2 pr-2 text-muted">{getCategoryById(p.categoryId)?.name || '—'}</td>
+                          <td className="py-2 text-right">
+                            <Button
+                              variant="surface"
+                              size="sm"
+                              onClick={() => handleTabChange('new')}
+                            >
+                              Reponer
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="space-y-2 md:hidden">
+                {paginatedReorder.map((p) => {
+                  const deficit = Math.max(0, p.minStock - p.stock)
+                  return (
+                    <div key={p.id} className="rounded-lg border border-border bg-surface p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-medium text-text">{p.name}</p>
+                          {p.brand && <p className="text-[10px] text-muted">{p.brand}</p>}
+                        </div>
+                        <span className="shrink-0 font-semibold text-danger-text">-{deficit} uds.</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between">
+                        <span className="text-[11px] text-muted">
+                          Stock: {p.stock} uds. · Mín: {p.minStock} uds. · {getCategoryById(p.categoryId)?.name || '—'}
+                        </span>
+                        <Button variant="surface" size="sm" onClick={() => handleTabChange('new')}>
+                          Reponer
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Pagination */}
+              {reorderTotalPages > 1 && (
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => setReorderPage(p => Math.max(1, p - 1))}
+                    disabled={reorderPage === 1}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-muted transition-colors hover:bg-primary-dim hover:text-primary-light disabled:pointer-events-none disabled:opacity-30"
+                  >
+                    <ChevronLeft size={13} /> Anterior
+                  </button>
+                  {Array.from({ length: reorderTotalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setReorderPage(page)}
+                      className={`flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-medium transition-colors ${
+                        page === reorderPage
+                          ? 'bg-primary-dim text-primary-light'
+                          : 'text-muted hover:bg-primary-dim/50 hover:text-muted-light'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setReorderPage(p => Math.min(reorderTotalPages, p + 1))}
+                    disabled={reorderPage === reorderTotalPages}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-muted transition-colors hover:bg-primary-dim hover:text-primary-light disabled:pointer-events-none disabled:opacity-30"
+                  >
+                    Siguiente <ChevronRight size={13} />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+      )}
 
       {tab === 'new' ? (
         <Card
@@ -360,7 +573,7 @@ export function Purchases() {
             </Button>
           </div>
         </Card>
-      ) : (
+      ) : tab === 'history' ? (
         <Card title="Historial de Compras" subtitle={`${purchases.length} compra${purchases.length !== 1 ? 's' : ''} registradas`}>
           {loading ? (
             <div className="divide-y divide-border/50 rounded-lg border border-border">
@@ -375,7 +588,7 @@ export function Purchases() {
               <Package size={36} className="opacity-40" />
               <p className="text-[13px]">No hay compras registradas todavía</p>
               <button
-                onClick={() => setTab('new')}
+                onClick={() => handleTabChange('new')}
                 className="text-[12px] text-primary-light hover:underline"
               >
                 Ir a nuevo ingreso
@@ -428,7 +641,7 @@ export function Purchases() {
             </div>
           )}
         </Card>
-      )}
+      ) : null}
 
       {/* Modal previsualización */}
       <Modal open={previewOpen} onClose={() => setPreviewOpen(false)} title="Previsualizar Ingreso" size="lg">
