@@ -1,7 +1,10 @@
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Formik, Form } from 'formik'
 import type { FormikProps } from 'formik'
-import { Plus, Minus, Trash2, FileText, AlertCircle, ShoppingCart, Search, X, Package } from 'lucide-react'
+import { Plus, Minus, Trash2, FileText, AlertCircle, ShoppingCart, Search, X, Package, Download } from 'lucide-react'
+import { Pagination } from '../components/ui/Pagination'
+import { BarcodeScanner } from '../components/ui/BarcodeScanner'
+import { exportToXLSX, type ExportColumn } from '../lib/export'
 import { toast } from 'sonner'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
@@ -72,6 +75,7 @@ export function Sales() {
   const [saleToVoid, setSaleToVoid] = useState<Sale | null>(null)
   const [detailSale, setDetailSale] = useState<Sale | null>(null)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [scannerOpen, setScannerOpen] = useState(false)
   const [sellerName, setSellerName] = useState<string | null>(null)
   const openDetail = useCallback((sale: Sale) => {
     setDetailSale(sale)
@@ -229,6 +233,28 @@ export function Sales() {
       return true
     })
   }, [sales, filterStatus, filterPayment, search])
+
+  const saleExportColumns: ExportColumn<Sale>[] = [
+    { key: 'id', header: 'ID', format: (v) => `#${String(v).slice(-8).toUpperCase()}` },
+    { key: (s) => s.items.length, header: 'Items' },
+    { key: 'total', header: 'Total', format: (v) => `${config.currency.symbol}${Number(v).toFixed(2)}` },
+    { key: 'paymentMethod', header: 'Método de pago', format: (v) => ({ cash: 'Efectivo', card: 'Tarjeta', transfer: 'Transferencia' })[String(v)] ?? String(v) },
+    { key: 'status', header: 'Estado', format: (v) => v === 'active' ? 'Activa' : 'Anulada' },
+    { key: 'createdAt', header: 'Fecha', format: (v) => new Date(Number(v)).toLocaleDateString('es-ES') },
+  ]
+
+  const [salePage, setSalePage] = useState(1)
+  const salePerPage = 20
+
+  useEffect(() => {
+    const maxPages = Math.max(1, Math.ceil(filteredSales.length / salePerPage))
+    if (salePage > maxPages) setSalePage(maxPages)
+  }, [filteredSales.length, salePage])
+
+  const paginatedSales = useMemo(() => {
+    const start = (salePage - 1) * salePerPage
+    return filteredSales.slice(start, start + salePerPage)
+  }, [filteredSales, salePage])
 
   const openCreate = useCallback(() => {
     setSelectedProductId('')
@@ -401,6 +427,9 @@ export function Sales() {
                 </p>
               </div>
             </div>
+            <Button variant="surface" size="sm" onClick={() => exportToXLSX(filteredSales, saleExportColumns, 'ventas')}>
+              <Download size={13} /> XLSX
+            </Button>
             {cart.length === 0 && (
               <Button variant="gold" size="sm" onClick={openCreate}>
                 <Plus size={15} /> Nueva venta
@@ -522,7 +551,7 @@ export function Sales() {
               )}
             </div>
           ) : (
-            filteredSales.map((sale) => {
+            paginatedSales.map((sale) => {
               const isVoided = sale.status === 'voided'
               return (
                 <div
@@ -619,16 +648,19 @@ export function Sales() {
         {/* Footer count */}
         {filteredSales.length > 0 && (
           <div
-            className="px-5 py-2.5 border-t flex items-center justify-between"
+            className="px-5 py-2.5 border-t"
             style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-bg)' }}
           >
-            <span className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>
-              {filteredSales.length} de {sales.length} venta{sales.length !== 1 ? 's' : ''}
-            </span>
-            <span className="text-[11px] font-medium" style={{ color: 'var(--clr-muted)' }}>
-              {filteredSales.filter((s) => s.status === 'active').length} activas ·{' '}
-              {filteredSales.filter((s) => s.status === 'voided').length} anuladas
-            </span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>
+                {filteredSales.length} de {sales.length} venta{sales.length !== 1 ? 's' : ''}
+              </span>
+              <span className="text-[11px] font-medium" style={{ color: 'var(--clr-muted)' }}>
+                {filteredSales.filter((s) => s.status === 'active').length} activas ·{' '}
+                {filteredSales.filter((s) => s.status === 'voided').length} anuladas
+              </span>
+            </div>
+            <Pagination page={salePage} totalPages={Math.max(1, Math.ceil(filteredSales.length / salePerPage))} onChange={setSalePage} />
           </div>
         )}
       </div>
@@ -652,14 +684,28 @@ export function Sales() {
             <Form>
               <div className="space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="min-w-0 flex-1">
-                    <SearchSelect
-                      label="Producto"
-                      options={productOptions}
-                      value={selectedProductId}
-                      onChange={setSelectedProductId}
-                      placeholder="Buscar por nombre o código de barras..."
-                    />
+                  <div className="min-w-0 flex-1 flex items-end gap-2">
+                    <div className="flex-1">
+                      <SearchSelect
+                        label="Producto"
+                        options={productOptions}
+                        value={selectedProductId}
+                        onChange={setSelectedProductId}
+                        placeholder="Buscar por nombre o código de barras..."
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setScannerOpen(true)}
+                      className="shrink-0 mb-[23px] flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-dim hover:text-primary-light"
+                      title="Escanear código de barras"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" />
+                        <path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+                        <line x1="7" x2="7" y1="12" y2="12" /><line x1="12" x2="12" y1="12" y2="12" /><line x1="17" x2="17" y1="12" y2="12" />
+                      </svg>
+                    </button>
                   </div>
                   <div className="w-full shrink-0 sm:w-24">
                     <Input ref={quantityRef} label="Cant." type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
@@ -976,6 +1022,21 @@ export function Sales() {
           </div>
         )}
       </Modal>
+
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={(code) => {
+          const found = products.find((p) => p.barcode === code)
+          if (found) {
+            setSelectedProductId(found.id)
+            toast.success(`${found.name} seleccionado`)
+          } else {
+            toast.error(`Producto con código ${code} no encontrado`)
+          }
+          setScannerOpen(false)
+        }}
+      />
     </>
   )
 }

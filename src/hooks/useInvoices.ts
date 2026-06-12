@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { toast } from 'sonner'
+import { isOnline } from '../lib/offline'
+import { db } from '../lib/db'
 import { useInvoiceStore } from '../stores/useInvoiceStore'
 import type { Invoice, InvoiceItem } from '../types'
 
@@ -43,6 +45,14 @@ export function useInvoices() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    if (!isOnline()) {
+      const cached = await db.invoices.toArray()
+      if (cached.length > 0) {
+        useInvoiceStore.setState({ invoices: cached })
+        setLoading(false)
+        return
+      }
+    }
     const { data, error: err } = await supabase
       .from('invoices')
       .select('*')
@@ -52,6 +62,10 @@ export function useInvoices() {
     } else if (data) {
       const mapped = (data as unknown as InvoiceRow[]).map(mapRow)
       useInvoiceStore.setState({ invoices: mapped })
+      if (isOnline()) {
+        await db.invoices.clear()
+        await db.invoices.bulkPut(mapped)
+      }
     }
     setLoading(false)
   }, [])

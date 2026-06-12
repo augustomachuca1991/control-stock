@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { toast } from 'sonner'
+import { isOnline } from '../lib/offline'
+import { db } from '../lib/db'
 import { useSaleStore } from '../stores/useSaleStore'
 import type { Sale, SaleItem, PaymentMethod } from '../types'
 
@@ -11,6 +13,14 @@ export function useSales() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    if (!isOnline()) {
+      const cached = await db.sales.toArray()
+      if (cached.length > 0) {
+        useSaleStore.setState({ sales: cached })
+        setLoading(false)
+        return
+      }
+    }
     const { data, error: err } = await supabase
       .from('sales')
       .select('*')
@@ -28,6 +38,10 @@ export function useSales() {
         createdAt: new Date(s.created_at).getTime(),
       }))
       useSaleStore.setState({ sales: mapped })
+      if (isOnline()) {
+        await db.sales.clear()
+        await db.sales.bulkPut(mapped)
+      }
     }
     setLoading(false)
   }, [])

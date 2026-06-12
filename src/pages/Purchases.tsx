@@ -1,7 +1,11 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
+
 import { useSearchParams } from 'react-router-dom'
 import { Formik, Form } from 'formik'
 import { Trash2, Package, FileText, Check, History, ShoppingCart, AlertTriangle, ChevronLeft, ChevronRight, Download, Mail } from 'lucide-react'
+
+import { Pagination } from '../components/ui/Pagination'
+import { exportToXLSX, type ExportColumn } from '../lib/export'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -64,6 +68,26 @@ export function Purchases() {
   const { add: addPurchase, loading: purchasesLoading } = usePurchases()
   const { loading: productsLoading } = useProducts()
   const loading = purchasesLoading || productsLoading
+
+  const [historyPage, setHistoryPage] = useState(1)
+  const historyPerPage = 15
+
+  useEffect(() => {
+    const maxPages = Math.max(1, Math.ceil(purchases.length / historyPerPage))
+    if (historyPage > maxPages) setHistoryPage(maxPages)
+  }, [purchases.length, historyPage])
+
+  const paginatedPurchases = useMemo(() => {
+    const start = (historyPage - 1) * historyPerPage
+    return purchases.slice(start, start + historyPerPage)
+  }, [purchases, historyPage])
+
+  const purchaseExportColumns: ExportColumn<import('../types').Purchase>[] = [
+    { key: (p) => `#${p.id.slice(-6).toUpperCase()}`, header: 'ID' },
+    { key: (p) => p.items.length, header: 'Artículos' },
+    { key: 'total', header: 'Total', format: (v) => `${config.currency.symbol}${Number(v).toFixed(2)}` },
+    { key: (p) => new Date(p.createdAt).toLocaleDateString('es-ES'), header: 'Fecha' },
+  ]
 
   const lowStockProducts = useMemo(() =>
     products.filter((p) => p.enabled && p.stock <= p.minStock),
@@ -574,7 +598,17 @@ export function Purchases() {
           </div>
         </Card>
       ) : tab === 'history' ? (
-        <Card title="Historial de Compras" subtitle={`${purchases.length} compra${purchases.length !== 1 ? 's' : ''} registradas`}>
+        <Card
+          title="Historial de Compras"
+          subtitle={`${purchases.length} compra${purchases.length !== 1 ? 's' : ''} registradas`}
+          actions={
+            <div className="flex gap-2">
+              <Button variant="surface" size="sm" onClick={() => exportToXLSX(purchases, purchaseExportColumns, 'compras')}>
+                <Download size={13} /> XLSX
+              </Button>
+            </div>
+          }
+        >
           {loading ? (
             <div className="divide-y divide-border/50 rounded-lg border border-border">
               <SkeletonRow />
@@ -596,7 +630,7 @@ export function Purchases() {
             </div>
           ) : (
             <div className="space-y-3">
-              {purchases.map((pch) => (
+              {paginatedPurchases.map((pch) => (
                 <div key={pch.id} className="rounded-lg border border-border bg-surface p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div>
@@ -640,6 +674,7 @@ export function Purchases() {
               ))}
             </div>
           )}
+          <Pagination page={historyPage} totalPages={Math.max(1, Math.ceil(purchases.length / historyPerPage))} onChange={setHistoryPage} totalItems={purchases.length} />
         </Card>
       ) : null}
 

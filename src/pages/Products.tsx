@@ -1,6 +1,9 @@
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Formik, Form } from 'formik'
-import { Plus, Pencil, Trash2, Search, Image as ImageIcon, X, ChevronRight, Upload, MessageCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Image as ImageIcon, X, ChevronRight, Upload, MessageCircle, Download } from 'lucide-react'
+import { Pagination } from '../components/ui/Pagination'
+import { BarcodeScanner } from '../components/ui/BarcodeScanner'
+import { exportToCSV, exportToXLSX, type ExportColumn } from '../lib/export'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -57,7 +60,12 @@ export function Products() {
   const [deleteConfirm, setDeleteConfirm] = useState<Product | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [scannerOpen, setScannerOpen] = useState(false)
   const barcodeRef = useRef<HTMLInputElement>(null)
+
+  // Pagination
+  const [page, setPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(20)
 
   useCategories()
   const products = useProductStore((s) => s.products)
@@ -76,6 +84,17 @@ export function Products() {
     if (filterCat) result = result.filter((p) => p.categoryId === filterCat)
     return result
   }, [products, search, filterCat])
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / itemsPerPage)), [filtered.length, itemsPerPage])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [totalPages, page])
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * itemsPerPage
+    return filtered.slice(start, start + itemsPerPage)
+  }, [filtered, page, itemsPerPage])
 
   const openCreate = useCallback(() => {
     setEditingId(null)
@@ -143,12 +162,31 @@ export function Products() {
     },
   ]
 
+  const productExportColumns: ExportColumn<Product>[] = [
+    { key: 'name', header: 'Nombre' },
+    { key: 'brand', header: 'Marca' },
+    { key: 'barcode', header: 'Código de Barras' },
+    { key: (p) => categories.find((c) => c.id === p.categoryId)?.name ?? '-', header: 'Categoría' },
+    { key: 'price', header: 'Precio', format: (v) => `${config.currency.symbol}${Number(v).toFixed(2)}` },
+    { key: 'cost', header: 'Costo', format: (v) => `${config.currency.symbol}${Number(v).toFixed(2)}` },
+    { key: 'stock', header: 'Stock', format: (v) => `${v} uds.` },
+    { key: 'minStock', header: 'Stock Mínimo', format: (v) => `${v} uds.` },
+    { key: 'enabled', header: 'Estado', format: (v) => v ? 'Activo' : 'Inactivo' },
+    { key: 'description', header: 'Descripción' },
+  ]
+
   return (
     <>
       <Card
         title="Productos"
         subtitle={`${filtered.length} producto${filtered.length !== 1 ? 's' : ''}`}
         actions={<div className="flex gap-2">
+          <Button variant="surface" size="sm" onClick={() => exportToCSV(filtered, productExportColumns, 'productos')}>
+            <Download size={14} /> CSV
+          </Button>
+          <Button variant="surface" size="sm" onClick={() => exportToXLSX(filtered, productExportColumns, 'productos')}>
+            <Download size={14} /> XLSX
+          </Button>
           <a href="https://t.me/marely_productos_bot" target="_blank" rel="noopener noreferrer">
             <Button variant="surface" size="sm"><MessageCircle size={16} /> Alta por IA</Button>
           </a>
@@ -157,12 +195,26 @@ export function Products() {
       >
         <div className="mb-4 flex flex-wrap gap-3">
           <div className="min-w-0 flex-1">
-            <Input
-              placeholder="Buscar por nombre, marca o código..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              icon={<Search size={15} className="text-muted" />}
-            />
+            <div className="relative">
+              <Input
+                placeholder="Buscar por nombre, marca o código..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                icon={<Search size={15} className="text-muted" />}
+              />
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-dim hover:text-primary-light"
+                title="Escanear código de barras"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" />
+                  <path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+                  <line x1="7" x2="7" y1="12" y2="12" /><line x1="12" x2="12" y1="12" y2="12" /><line x1="17" x2="17" y1="12" y2="12" />
+                </svg>
+              </button>
+            </div>
           </div>
           <div className="w-44">
             <select
@@ -185,9 +237,10 @@ export function Products() {
             <SkeletonRow />
           </div>
         ) : (
+        <>
         <Table
           columns={columns}
-          data={filtered}
+          data={paginated}
           keyExtractor={(p) => p.id}
           emptyMessage="No se encontraron productos"
           onRowClick={openDetail}
@@ -223,6 +276,8 @@ export function Products() {
             </div>
           )}
         />
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} itemsPerPage={itemsPerPage} onItemsPerPageChange={(n) => { setItemsPerPage(n); setPage(1) }} totalItems={filtered.length} />
+        </>
         )}
       </Card>
 
@@ -433,6 +488,12 @@ export function Products() {
           />
         </div>
       )}
+
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={(code) => { setSearch(code); setScannerOpen(false) }}
+      />
     </>
   )
 }

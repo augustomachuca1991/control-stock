@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { applyThemeColors } from './config'
 import { AuthProvider } from './contexts/AuthContext'
+import { OfflineProvider } from './contexts/OfflineProvider'
 import App from './App'
 
 applyThemeColors()
@@ -10,7 +11,9 @@ applyThemeColors()
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
-      <App />
+      <OfflineProvider>
+        <App />
+      </OfflineProvider>
     </AuthProvider>
   </StrictMode>,
 )

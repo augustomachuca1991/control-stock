@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { toast } from 'sonner'
+import { isOnline } from '../lib/offline'
+import { db } from '../lib/db'
 import { useCategoryStore } from '../stores/useCategoryStore'
 import type { Category } from '../types'
 
@@ -11,6 +13,14 @@ export function useCategories() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    if (!isOnline()) {
+      const cached = await db.categories.toArray()
+      if (cached.length > 0) {
+        useCategoryStore.setState({ categories: cached })
+        setLoading(false)
+        return
+      }
+    }
     const { data, error: err } = await supabase
       .from('categories')
       .select('*')
@@ -19,6 +29,10 @@ export function useCategories() {
       setError(err.message)
     } else if (data) {
       useCategoryStore.setState({ categories: data })
+      if (isOnline()) {
+        await db.categories.clear()
+        await db.categories.bulkPut(data)
+      }
     }
     setLoading(false)
   }, [])

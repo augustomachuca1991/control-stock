@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Formik, Form } from 'formik'
-import { Menu, LogOut, Sun, Moon, Upload, ShoppingCart, UserCog, Database } from 'lucide-react'
+import { Menu, LogOut, Sun, Moon, Upload, ShoppingCart, UserCog, Database, WifiOff } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProfile } from '../../hooks/useProfile'
 import { useThemeStore } from '../../stores/useThemeStore'
 import { useSaleStore } from '../../stores/useSaleStore'
+import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { Modal } from '../ui/Modal'
 import { Img } from '../ui/Img'
 import { Input } from '../ui/Input'
@@ -22,6 +23,7 @@ const titles: Record<string, string> = {
   '/purchases': 'Compras',
   '/categories': 'Categorías',
   '/invoices': 'Factura',
+  '/reports': 'Reportes',
   '/settings': 'Ajustes',
 }
 
@@ -57,6 +59,8 @@ export function Header({ onToggleSidebar }: HeaderProps) {
     navigate('/login')
   }, [signOut, navigate])
 
+  const { isOnline } = useOnlineStatus()
+
   const initial = user?.email?.charAt(0).toUpperCase() ?? 'U'
 
   const today = new Date().toLocaleDateString('es-ES', {
@@ -88,6 +92,14 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {!isOnline && (
+            <span
+              className="flex items-center gap-1 rounded-full bg-danger-dim px-2.5 py-1 text-[10px] font-semibold text-danger-text"
+              title="Sin conexión — mostrando datos locales"
+            >
+              <WifiOff size={12} /> Offline
+            </span>
+          )}
           <button
             onClick={toggleTheme}
             className="rounded-lg p-1.5 text-muted transition-colors hover:bg-primary-dim hover:text-primary-light"

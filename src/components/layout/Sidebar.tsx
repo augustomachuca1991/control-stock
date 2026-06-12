@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, ShoppingCart, Tags, ClipboardList, FileText, Settings } from 'lucide-react'
+import { LayoutDashboard, Package, ShoppingCart, Tags, ClipboardList, FileText, Settings, BarChart3 } from 'lucide-react'
 import MarelyLogo from '../ui/MarelyLogo'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -19,6 +19,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     { to: '/purchases', label: 'Compras', icon: ClipboardList },
     { to: '/categories', label: 'Categorías', icon: Tags },
     { to: '/invoices', label: 'Factura', icon: FileText },
+    { to: '/reports', label: 'Reportes', icon: BarChart3 },
     ...(isAdmin ? [{ to: '/settings', label: 'Ajustes', icon: Settings }] : []),
   ], [isAdmin])
   useEffect(() => {

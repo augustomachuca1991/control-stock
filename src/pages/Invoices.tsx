@@ -1,5 +1,6 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Upload, FileText, Loader2, CheckCircle2, AlertCircle, X, Package, ScanLine } from 'lucide-react'
+import { Pagination } from '../components/ui/Pagination'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
@@ -100,6 +101,20 @@ export function Invoices() {
   const { add: addPurchase } = usePurchases()
   const { invoices, add: addInvoice, loading: invoicesLoading } = useInvoices()
   const categories = useCategoryStore((s) => s.categories)
+
+  const [invPage, setInvPage] = useState(1)
+  const invPerPage = 10
+
+  useEffect(() => {
+    const maxPages = Math.max(1, Math.ceil(invoices.length / invPerPage))
+    if (invPage > maxPages) setInvPage(maxPages)
+  }, [invoices.length, invPage])
+
+  const paginatedInvoices = useMemo(() => {
+    const start = (invPage - 1) * invPerPage
+    return invoices.slice(start, start + invPerPage)
+  }, [invoices, invPage])
+
   const inputRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
 
@@ -622,7 +637,7 @@ export function Invoices() {
           <p className="py-6 text-center text-[13px] text-muted">Todavía no se procesaron facturas</p>
         ) : (
           <div className="space-y-2">
-            {invoices.map((inv) => (
+            {paginatedInvoices.map((inv) => (
               <div
                 key={inv.id}
                 className="flex items-start gap-3 rounded-lg border border-border bg-surface-dim p-3"
@@ -674,6 +689,7 @@ export function Invoices() {
             ))}
           </div>
         )}
+        <Pagination page={invPage} totalPages={Math.max(1, Math.ceil(invoices.length / invPerPage))} onChange={setInvPage} totalItems={invoices.length} />
       </Card>
 
       {/* ─── Modal imagen ampliada ─── */}

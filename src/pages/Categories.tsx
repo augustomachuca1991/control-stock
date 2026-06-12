@@ -1,6 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { Formik, Form } from 'formik'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Download } from 'lucide-react'
+import { Pagination } from '../components/ui/Pagination'
+import { exportToXLSX, type ExportColumn } from '../lib/export'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
@@ -18,8 +20,26 @@ export function Categories() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null)
   const [saving, setSaving] = useState(false)
 
+  const catExportColumns: ExportColumn<import('../types').Category>[] = [
+    { key: 'name', header: 'Nombre' },
+    { key: 'description', header: 'Descripción' },
+  ]
+
   const categories = useCategoryStore((s) => s.categories)
   const { add: addCategory, update: updateCategory, delete: deleteCategory, loading } = useCategories()
+
+  const [catPage, setCatPage] = useState(1)
+  const catPerPage = 18
+
+  useEffect(() => {
+    const maxPages = Math.max(1, Math.ceil(categories.length / catPerPage))
+    if (catPage > maxPages) setCatPage(maxPages)
+  }, [categories.length, catPage])
+
+  const paginatedCats = useMemo(() => {
+    const start = (catPage - 1) * catPerPage
+    return categories.slice(start, start + catPerPage)
+  }, [categories, catPage])
 
   const openCreate = useCallback(() => {
     setEditingId(null)
@@ -38,7 +58,12 @@ export function Categories() {
       <Card
         title="Categorías"
         subtitle={`${categories.length} categoría${categories.length !== 1 ? 's' : ''}`}
-        actions={<Button variant="gold" size="sm" onClick={openCreate}><Plus size={16} /> Nueva</Button>}
+        actions={<div className="flex gap-2">
+          <Button variant="surface" size="sm" onClick={() => exportToXLSX(categories, catExportColumns, 'categorias')}>
+            <Download size={13} /> XLSX
+          </Button>
+          <Button variant="gold" size="sm" onClick={openCreate}><Plus size={16} /> Nueva</Button>
+        </div>}
       >
         {loading ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -49,8 +74,9 @@ export function Categories() {
         ) : categories.length === 0 ? (
           <p className="py-6 text-center text-[13px] text-muted">No hay categorías. Creá la primera.</p>
         ) : (
+          <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.map((cat) => (
+            {paginatedCats.map((cat) => (
               <div key={cat.id} className="group rounded-lg border border-border bg-surface p-4 transition-colors hover:border-border-strong">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -71,6 +97,8 @@ export function Categories() {
               </div>
             ))}
           </div>
+          <Pagination page={catPage} totalPages={Math.max(1, Math.ceil(categories.length / catPerPage))} onChange={setCatPage} totalItems={categories.length} />
+          </>
         )}
       </Card>
 

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { toast } from 'sonner'
+import { isOnline } from '../lib/offline'
+import { db } from '../lib/db'
 import { useProductStore } from '../stores/useProductStore'
 import type { Product } from '../types'
 
@@ -13,6 +15,14 @@ export function useProducts() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    if (!isOnline()) {
+      const cached = await db.products.toArray()
+      if (cached.length > 0) {
+        useProductStore.setState({ products: cached })
+        setLoading(false)
+        return
+      }
+    }
     const { data, error: err } = await supabase
       .from('products')
       .select('*')
@@ -30,6 +40,10 @@ export function useProducts() {
         updatedAt: new Date(p.updated_at).getTime(),
       })) as unknown as Product[]
       useProductStore.setState({ products: mapped })
+      if (isOnline()) {
+        await db.products.clear()
+        await db.products.bulkPut(mapped)
+      }
     }
     setLoading(false)
   }, [])
