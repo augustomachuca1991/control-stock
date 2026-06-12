@@ -16,15 +16,29 @@ export function BarcodeScanner({ open, onClose, onDetected }: BarcodeScannerProp
   const [manualCode, setManualCode] = useState('')
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const detectedOnce = useRef(false)
+  const stoppedRef = useRef(false)
+  const onDetectedRef = useRef(onDetected)
+  const onCloseRef = useRef(onClose)
+
+  onDetectedRef.current = onDetected
+  onCloseRef.current = onClose
+
+  async function stopScanner(scanner: Html5Qrcode | null) {
+    if (!scanner || stoppedRef.current) return
+    stoppedRef.current = true
+    try { await scanner.stop() } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     if (!open) {
       detectedOnce.current = false
+      stoppedRef.current = false
       setError('')
       setManualCode('')
-      scannerRef.current?.stop().catch(() => {})
       return
     }
+
+    let cancelled = false
 
     const start = async () => {
       try {
@@ -39,23 +53,26 @@ export function BarcodeScanner({ open, onClose, onDetected }: BarcodeScannerProp
           (decodedText) => {
             if (detectedOnce.current) return
             detectedOnce.current = true
-            scanner.stop().catch(() => {})
-            onDetected(decodedText)
-            onClose()
+            stopScanner(scanner)
+            onDetectedRef.current(decodedText)
+            onCloseRef.current()
           },
           () => {},
         )
-      } catch (err) {
-        setError('No se pudo acceder a la cámara. Permití el acceso o ingresá el código manualmente.')
+      } catch {
+        if (!cancelled) {
+          setError('No se pudo acceder a la cámara. Permití el acceso o ingresá el código manualmente.')
+        }
       }
     }
 
     const timeout = setTimeout(start, 300)
     return () => {
+      cancelled = true
       clearTimeout(timeout)
-      scannerRef.current?.stop().catch(() => {})
+      stopScanner(scannerRef.current)
     }
-  }, [open, onDetected, onClose])
+  }, [open])
 
   const handleManualSubmit = () => {
     const code = manualCode.trim()

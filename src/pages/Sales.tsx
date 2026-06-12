@@ -697,7 +697,7 @@ export function Sales() {
                     <button
                       type="button"
                       onClick={() => setScannerOpen(true)}
-                      className="shrink-0 mb-[23px] flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-dim hover:text-primary-light"
+                      className="shrink-0 mb-7 flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-dim hover:text-primary-light"
                       title="Escanear código de barras"
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

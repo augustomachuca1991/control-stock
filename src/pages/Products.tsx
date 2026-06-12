@@ -1,9 +1,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Formik, Form } from 'formik'
-import { Plus, Pencil, Trash2, Search, Image as ImageIcon, X, ChevronRight, Upload, MessageCircle, Download } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Image as ImageIcon, X, ChevronRight, Upload, MessageCircle } from 'lucide-react'
 import { Pagination } from '../components/ui/Pagination'
 import { BarcodeScanner } from '../components/ui/BarcodeScanner'
-import { exportToCSV, exportToXLSX, type ExportColumn } from '../lib/export'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -162,31 +161,18 @@ export function Products() {
     },
   ]
 
-  const productExportColumns: ExportColumn<Product>[] = [
-    { key: 'name', header: 'Nombre' },
-    { key: 'brand', header: 'Marca' },
-    { key: 'barcode', header: 'Código de Barras' },
-    { key: (p) => categories.find((c) => c.id === p.categoryId)?.name ?? '-', header: 'Categoría' },
-    { key: 'price', header: 'Precio', format: (v) => `${config.currency.symbol}${Number(v).toFixed(2)}` },
-    { key: 'cost', header: 'Costo', format: (v) => `${config.currency.symbol}${Number(v).toFixed(2)}` },
-    { key: 'stock', header: 'Stock', format: (v) => `${v} uds.` },
-    { key: 'minStock', header: 'Stock Mínimo', format: (v) => `${v} uds.` },
-    { key: 'enabled', header: 'Estado', format: (v) => v ? 'Activo' : 'Inactivo' },
-    { key: 'description', header: 'Descripción' },
-  ]
-
   return (
     <>
       <Card
         title="Productos"
         subtitle={`${filtered.length} producto${filtered.length !== 1 ? 's' : ''}`}
         actions={<div className="flex gap-2">
-          <Button variant="surface" size="sm" onClick={() => exportToCSV(filtered, productExportColumns, 'productos')}>
+          {/* <Button variant="surface" size="sm" onClick={() => exportToCSV(filtered, productExportColumns, 'productos')}>
             <Download size={14} /> CSV
           </Button>
           <Button variant="surface" size="sm" onClick={() => exportToXLSX(filtered, productExportColumns, 'productos')}>
             <Download size={14} /> XLSX
-          </Button>
+          </Button> */}
           <a href="https://t.me/marely_productos_bot" target="_blank" rel="noopener noreferrer">
             <Button variant="surface" size="sm"><MessageCircle size={16} /> Alta por IA</Button>
           </a>
@@ -205,7 +191,7 @@ export function Products() {
               <button
                 type="button"
                 onClick={() => setScannerOpen(true)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-dim hover:text-primary-light"
+                className="absolute right-2 top-1 flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-dim hover:text-primary-light"
                 title="Escanear código de barras"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -216,7 +202,7 @@ export function Products() {
               </button>
             </div>
           </div>
-          <div className="w-44">
+          <div className="w-full sm:w-44">
             <select
               value={filterCat}
               onChange={(e) => setFilterCat(e.target.value)}
@@ -237,47 +223,47 @@ export function Products() {
             <SkeletonRow />
           </div>
         ) : (
-        <>
-        <Table
-          columns={columns}
-          data={paginated}
-          keyExtractor={(p) => p.id}
-          emptyMessage="No se encontraron productos"
-          onRowClick={openDetail}
-          renderCard={(p) => (
-            <div className={`flex items-start gap-3 ${p.stock === 0 ? 'opacity-60' : ''}`}>
-              <ProductThumb src={p.images?.[0]} className="h-14 w-14 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className={`font-semibold ${p.stock === 0 ? 'line-through text-muted' : 'text-text'}`}>{p.name}</p>
-                    <p className={`text-[11px] ${p.stock === 0 ? 'line-through text-muted' : 'text-muted'}`}>{p.brand}</p>
-                  </div>
-                  <div className="flex shrink-0 gap-1">
-                    <Button variant="surface" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(e, p.id) }}>
-                      <Pencil size={13} className="text-muted-light" />
-                    </Button>
-                    {isAdmin && (
-                      <Button variant="surface" size="sm" onClick={(e) => { e.stopPropagation(); setDeleteConfirm(p) }}>
-                        <Trash2 size={13} className="text-danger-text" />
-                      </Button>
-                    )}
-                    <ChevronRight size={16} className="mt-0.5 text-muted" />
+          <>
+            <Table
+              columns={columns}
+              data={paginated}
+              keyExtractor={(p) => p.id}
+              emptyMessage="No se encontraron productos"
+              onRowClick={openDetail}
+              renderCard={(p) => (
+                <div className={`flex items-start gap-3 ${p.stock === 0 ? 'opacity-60' : ''}`}>
+                  <ProductThumb src={p.images?.[0]} className="h-14 w-14 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className={`font-semibold ${p.stock === 0 ? 'line-through text-muted' : 'text-text'}`}>{p.name}</p>
+                        <p className={`text-[11px] ${p.stock === 0 ? 'line-through text-muted' : 'text-muted'}`}>{p.brand}</p>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <Button variant="surface" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(e, p.id) }}>
+                          <Pencil size={13} className="text-muted-light" />
+                        </Button>
+                        {isAdmin && (
+                          <Button variant="surface" size="sm" onClick={(e) => { e.stopPropagation(); setDeleteConfirm(p) }}>
+                            <Trash2 size={13} className="text-danger-text" />
+                          </Button>
+                        )}
+                        <ChevronRight size={16} className="mt-0.5 text-muted" />
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                      {!p.enabled && <Badge variant="danger">Deshabilitado</Badge>}
+                      <Badge variant="default">{categoryName(p.categoryId)}</Badge>
+                      <span className={`font-bold ${p.stock === 0 ? 'line-through text-muted' : 'text-accent'}`}>{config.currency.symbol}{p.price.toFixed(2)}</span>
+                      <span className={p.stock <= p.minStock && p.stock > 0 ? 'font-bold text-danger-text' : p.stock === 0 ? 'line-through text-muted' : 'text-muted-light'}>{p.stock} uds.</span>
+                    </div>
+                    <code className={`mt-1 inline-block rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] ${p.stock === 0 ? 'line-through text-muted' : 'text-muted'}`}>{p.barcode}</code>
                   </div>
                 </div>
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-                  {!p.enabled && <Badge variant="danger">Deshabilitado</Badge>}
-                  <Badge variant="default">{categoryName(p.categoryId)}</Badge>
-                  <span className={`font-bold ${p.stock === 0 ? 'line-through text-muted' : 'text-accent'}`}>{config.currency.symbol}{p.price.toFixed(2)}</span>
-                  <span className={p.stock <= p.minStock && p.stock > 0 ? 'font-bold text-danger-text' : p.stock === 0 ? 'line-through text-muted' : 'text-muted-light'}>{p.stock} uds.</span>
-                </div>
-                <code className={`mt-1 inline-block rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] ${p.stock === 0 ? 'line-through text-muted' : 'text-muted'}`}>{p.barcode}</code>
-              </div>
-            </div>
-          )}
-        />
-        <Pagination page={page} totalPages={totalPages} onChange={setPage} itemsPerPage={itemsPerPage} onItemsPerPageChange={(n) => { setItemsPerPage(n); setPage(1) }} totalItems={filtered.length} />
-        </>
+              )}
+            />
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} itemsPerPage={itemsPerPage} onItemsPerPageChange={(n) => { setItemsPerPage(n); setPage(1) }} totalItems={filtered.length} />
+          </>
         )}
       </Card>
 
