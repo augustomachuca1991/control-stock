@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { X, Camera, CameraOff, Loader2 } from 'lucide-react'
 import { Modal } from './Modal'
 import { Html5Qrcode } from 'html5-qrcode'
@@ -9,9 +9,8 @@ interface BarcodeScannerProps {
   onDetected: (barcode: string) => void
 }
 
-const SCANNER_ID = 'barcode-scanner-element'
-
 export function BarcodeScanner({ open, onClose, onDetected }: BarcodeScannerProps) {
+  const scannerId = useId()
   const [error, setError] = useState('')
   const [manualCode, setManualCode] = useState('')
   const scannerRef = useRef<Html5Qrcode | null>(null)
@@ -42,7 +41,7 @@ export function BarcodeScanner({ open, onClose, onDetected }: BarcodeScannerProp
 
     const start = async () => {
       try {
-        const scanner = new Html5Qrcode(SCANNER_ID)
+        const scanner = new Html5Qrcode(scannerId)
         scannerRef.current = scanner
         await scanner.start(
           { facingMode: 'environment' },
@@ -92,7 +91,7 @@ export function BarcodeScanner({ open, onClose, onDetected }: BarcodeScannerProp
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg border border-border bg-black">
-            <div id={SCANNER_ID} className="h-56 w-full" />
+            <div id={scannerId} className="h-56 w-full" />
             <div className="flex items-center justify-center gap-2 border-t border-border/30 bg-black/80 py-2">
               <Camera size={14} className="text-white/60" />
               <span className="text-[11px] text-white/60">Apuntá la cámara al código de barras</span>

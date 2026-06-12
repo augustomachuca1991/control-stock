@@ -60,6 +60,7 @@ export function Products() {
   const [deleting, setDeleting] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [formScannerOpen, setFormScannerOpen] = useState(false)
   const barcodeRef = useRef<HTMLInputElement>(null)
 
   // Pagination
@@ -78,7 +79,7 @@ export function Products() {
     let result = products
     if (search) {
       const q = search.toLowerCase()
-      result = result.filter((p) => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.barcode.includes(q))
+      result = result.filter((p) => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.barcode.toLowerCase().includes(q))
     }
     if (filterCat) result = result.filter((p) => p.categoryId === filterCat)
     return result
@@ -298,13 +299,28 @@ export function Products() {
           }}
         >
           {({ values, setFieldValue, isSubmitting, resetForm }) => (
+            <>
             <Form>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <Field name="name" label="Nombre" />
                 </div>
                 <Field name="brand" label="Marca" />
-                <Field name="barcode" label="Código de Barras" placeholder="Escanear o escribir..." />
+                <div className="relative">
+                  <Field name="barcode" label="Código de Barras" placeholder="Escanear o escribir..." />
+                  <button
+                    type="button"
+                    onClick={() => setFormScannerOpen(true)}
+                    className="absolute right-2 top-[30px] flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-dim hover:text-primary-light"
+                    title="Escanear código de barras"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" />
+                      <path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+                      <line x1="7" x2="7" y1="12" y2="12" /><line x1="12" x2="12" y1="12" y2="12" /><line x1="17" x2="17" y1="12" y2="12" />
+                    </svg>
+                  </button>
+                </div>
                 <SelectField name="categoryId" label="Categoría" placeholder="Seleccionar" options={catOptions} />
                 <Field name="price" label={`Precio (${config.currency.code})`} type="number" step="0.01" min="0" />
                 <Field name="cost" label={`Costo (${config.currency.code})`} type="number" step="0.01" min="0" />
@@ -383,6 +399,16 @@ export function Products() {
                 </Button>
               </div>
             </Form>
+
+            <BarcodeScanner
+              open={formScannerOpen}
+              onClose={() => setFormScannerOpen(false)}
+              onDetected={(code) => {
+                setFieldValue('barcode', code.trim())
+                setFormScannerOpen(false)
+              }}
+            />
+            </>
           )}
         </Formik>
       </Modal>
@@ -478,8 +504,9 @@ export function Products() {
       <BarcodeScanner
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}
-        onDetected={(code) => { setSearch(code); setScannerOpen(false) }}
+        onDetected={(code) => { setSearch(code.trim()); setScannerOpen(false) }}
       />
+
     </>
   )
 }
