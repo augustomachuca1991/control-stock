@@ -74,7 +74,7 @@ describe('VoidConfirmModal', () => {
   })
 
   it('renders nothing when saleToVoid is null', () => {
-    const { container } = render(
+    render(
       <VoidConfirmModal
         open={true}
         onClose={vi.fn()}

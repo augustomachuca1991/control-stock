@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useSaleStore } from './useSaleStore'
-import type { CartItem, Sale } from '../types'
+import type { CartItem } from './useSaleStore'
+import type { Sale } from '../types'
 
 // Helper to build a CartItem
 function cartItem(overrides: Partial<CartItem> = {}): CartItem {
