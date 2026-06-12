@@ -1,7 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import { Formik, Form } from 'formik'
-import type { FormikProps } from 'formik'
-import { Plus, Minus, Trash2, FileText, AlertCircle, ShoppingCart, Search, X, Package, Download } from 'lucide-react'
+import { Plus, Minus, Trash2, FileText, AlertCircle, ShoppingCart, Search, X, Package, Download, History, DollarSign } from 'lucide-react'
 import { Pagination } from '../components/ui/Pagination'
 import { BarcodeScanner } from '../components/ui/BarcodeScanner'
 import { exportToXLSX, type ExportColumn } from '../lib/export'
@@ -10,7 +8,6 @@ import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { SearchSelect } from '../components/ui/SearchSelect'
 import { Input } from '../components/ui/Input'
-import { SelectField } from '../components/ui/SelectField'
 import { Img } from '../components/ui/Img'
 import MarelyLogo from '../components/ui/MarelyLogo'
 import { SkeletonRow } from '../components/ui/Skeleton'
@@ -19,7 +16,6 @@ import { useSaleStore } from '../stores/useSaleStore'
 import { useSales } from '../hooks/useSales'
 import { useProducts } from '../hooks/useProducts'
 import { supabase } from '../lib/supabaseClient'
-import { saleSchema } from '../lib/validation'
 import type { Sale, SaleStatus, PaymentMethod } from '../types'
 import type { CartItem } from '../stores/useSaleStore'
 import { config } from '../config'
@@ -65,7 +61,7 @@ function PaymentTag({ method }: { method: PaymentMethod }) {
 
 export function Sales() {
   const { isAdmin } = useAuth()
-  const [modalOpen, setModalOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'venta' | 'historico'>('venta')
   const [selectedProductId, setSelectedProductId] = useState('')
   const [quantity, setQuantity] = useState('1')
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -97,8 +93,9 @@ export function Sales() {
   const [filterPayment, setFilterPayment] = useState<FilterPayment>('all')
   const [search, setSearch] = useState('')
 
+  const [cartModalOpen, setCartModalOpen] = useState(false)
+  const [cashAmount, setCashAmount] = useState('')
   const quantityRef = useRef<HTMLInputElement>(null)
-  const saleFormikRef = useRef<FormikProps<{ paymentMethod: PaymentMethod }>>(null)
 
   const products = useProductStore((s) => s.products)
   const sales = useSaleStore((s) => s.sales)
@@ -256,12 +253,6 @@ export function Sales() {
     return filteredSales.slice(start, start + salePerPage)
   }, [filteredSales, salePage])
 
-  const openCreate = useCallback(() => {
-    setSelectedProductId('')
-    setQuantity('1')
-    setModalOpen(true)
-  }, [])
-
   const addToCart = useCallback(() => {
     if (!selectedProductId) return
     const q = parseInt(quantity, 10) || 1
@@ -302,7 +293,7 @@ export function Sales() {
 
   const handleConfirmSale = useCallback(async () => {
     setConfirming(true)
-    const paymentMethod = saleFormikRef.current?.values.paymentMethod ?? 'cash'
+    const paymentMethod = previewPaymentMethod
     for (const item of cart) {
       const product = getProductById(item.productId)
       if (!product) {
@@ -333,7 +324,6 @@ export function Sales() {
     }
     setConfirming(false)
     setPreviewOpen(false)
-    setModalOpen(false)
     clearCart()
     if (sale) setReceiptOpen(true)
   }, [cart, createSale, reduceStock, getProductById, clearCart])
@@ -359,12 +349,53 @@ export function Sales() {
     [products]
   )
 
+  const availableProducts = useMemo(
+    () => products.filter((p) => p.enabled !== false && p.stock > 0),
+    [products]
+  )
+
+  const productsPerPage = 20
+  const [productPage, setProductPage] = useState(1)
+
+  const paginatedProducts = useMemo(() => {
+    const start = (productPage - 1) * productsPerPage
+    return availableProducts.slice(start, start + productsPerPage)
+  }, [availableProducts, productPage])
+
+  useEffect(() => {
+    setProductPage(1)
+  }, [availableProducts.length])
+
+  const quickAdd = useCallback((productId: string) => {
+    const product = getProductById(productId)
+    if (!product || product.stock <= 0) return
+    const existing = cart.find((c) => c.productId === productId)
+    const currentCartQty = existing ? existing.quantity : 0
+    if (currentCartQty >= product.stock) {
+      toast.error(`Stock insuficiente de ${product.name}`)
+      return
+    }
+    addToCartStore({
+      productId: product.id,
+      productName: product.name,
+      quantity: existing ? existing.quantity + 1 : 1,
+      unitPrice: product.price,
+      maxStock: product.stock,
+    })
+    toast.success(`${product.name} agregado al carrito`)
+  }, [getProductById, cart, addToCartStore])
+
+  const cambio = useMemo(() => {
+    if (previewPaymentMethod !== 'cash' || !cashAmount) return 0
+    return Math.max(0, parseFloat(cashAmount) - cartTotal)
+  }, [previewPaymentMethod, cashAmount, cartTotal])
+
   const hasActiveFilters = filterStatus !== 'all' || filterPayment !== 'all' || search.trim() !== ''
 
   return (
     <>
-      {/* Cart banner */}
-      {cart.length > 0 && !modalOpen && (
+      {/* Cart banner — only shown when on 'historico' tab with items in cart */}
+      {cart.length > 0 && (
         <div
           className="mb-4 flex items-center justify-between rounded-xl border px-4 py-3"
           style={{
@@ -386,407 +417,518 @@ export function Sales() {
             >
               Vaciar
             </button>
-            <Button variant="gold" size="sm" onClick={() => setModalOpen(true)}>
+            <Button variant="gold" size="sm" onClick={() => setCartModalOpen(true)}>
               <ShoppingCart size={13} /> Ir al carrito
             </Button>
           </div>
         </div>
       )}
 
+      {/* Tab bar */}
+      <div className="flex gap-1 rounded-lg border border-border bg-surface p-1 w-fit mb-4">
+        <button
+          onClick={() => setActiveTab('venta')}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${activeTab === 'venta'
+            ? 'bg-primary-dim text-primary-light'
+            : 'text-muted hover:text-muted-light'
+            }`}
+        >
+          <ShoppingCart size={14} /> Venta
+        </button>
+        <button
+          onClick={() => setActiveTab('historico')}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${activeTab === 'historico'
+            ? 'bg-primary-dim text-primary-light'
+            : 'text-muted hover:text-muted-light'
+            }`}
+        >
+          <History size={14} /> Histórico
+        </button>
+      </div>
+
       {/* Main panel */}
       <div
         className="rounded-2xl border overflow-hidden"
         style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-card)' }}
       >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-5 py-4 border-b"
-          style={{ borderColor: 'var(--clr-border)' }}
-        >
-          <div>
-            <h2 className="text-[10px] font-semibold uppercase tracking-[0.8px] text-muted">
-              Ventas
-            </h2>
-            <p className="mt-0.5 text-[11px] text-muted">
-              {sales.length} venta{sales.length !== 1 ? 's' : ''} registradas
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Mini stats */}
-            <div className="hidden sm:flex items-center gap-4 mr-2">
-              <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--clr-muted)' }}>Total activo</p>
-                <p className="text-[14px] font-semibold" style={{ color: 'var(--clr-primary)' }}>
-                  {config.currency.symbol}{totalToday.toFixed(2)}
+        {activeTab === 'historico' ? (
+          <>
+            {/* Header stats + XLSX */}
+            <div
+              className="flex items-center justify-between px-5 py-3 border-b"
+              style={{ borderColor: 'var(--clr-border)' }}
+            >
+              <div>
+                <h2 className="text-[10px] font-semibold uppercase tracking-[0.8px] text-muted">
+                  Histórico
+                </h2>
+                <p className="mt-0.5 text-[11px] text-muted">
+                  {sales.length} venta{sales.length !== 1 ? 's' : ''} registradas
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--clr-muted)' }}>Ticket prom.</p>
-                <p className="text-[14px] font-semibold" style={{ color: 'var(--clr-text)' }}>
-                  {config.currency.symbol}{avgTicket.toFixed(2)}
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="hidden sm:flex items-center gap-4 mr-2">
+                  <div className="text-right">
+                    <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--clr-muted)' }}>Total activo</p>
+                    <p className="text-[14px] font-semibold" style={{ color: 'var(--clr-primary)' }}>
+                      {config.currency.symbol}{totalToday.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--clr-muted)' }}>Ticket prom.</p>
+                    <p className="text-[14px] font-semibold" style={{ color: 'var(--clr-text)' }}>
+                      {config.currency.symbol}{avgTicket.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+                <Button variant="surface" size="sm" onClick={() => exportToXLSX(filteredSales, saleExportColumns, 'ventas')}>
+                  <Download size={13} /> XLSX
+                </Button>
               </div>
             </div>
-            <Button variant="surface" size="sm" onClick={() => exportToXLSX(filteredSales, saleExportColumns, 'ventas')}>
-              <Download size={13} /> XLSX
-            </Button>
-            {cart.length === 0 && (
-              <Button variant="gold" size="sm" onClick={openCreate}>
-                <Plus size={15} /> Nueva venta
-              </Button>
-            )}
-          </div>
-        </div>
 
-        {/* Filters + Search bar */}
-        <div
-          className="flex flex-col sm:flex-row sm:items-center gap-2 px-5 py-3 border-b"
-          style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-bg)' }}
-        >
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--clr-muted)' }} />
-            <input
-              type="text"
-              placeholder="Buscar por producto o ID..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg pl-8 pr-8 py-2 text-[13px] border outline-none transition-colors placeholder:text-[var(--clr-muted)]"
-              style={{
-                background: 'var(--clr-surface)',
-                borderColor: 'var(--clr-border)',
-                color: 'var(--clr-text)',
-                colorScheme: 'dark',
-              }}
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2"
-                style={{ color: 'var(--clr-muted)' }}
-              >
-                <X size={13} />
-              </button>
-            )}
-          </div>
-
-          {/* Status filter pills */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            {(['all', 'active', 'voided'] as FilterStatus[]).map((f) => {
-              const labels = { all: 'Todas', active: 'Activas', voided: 'Anuladas' }
-              const isActive = filterStatus === f
-              return (
-                <button
-                  key={f}
-                  onClick={() => setFilterStatus(f)}
-                  className="rounded-full px-3 py-1 text-[12px] font-medium transition-all border"
-                  style={
-                    isActive
-                      ? { background: 'var(--clr-primary)', color: '#fff', borderColor: 'var(--clr-primary)' }
-                      : { background: 'transparent', color: 'var(--clr-muted)', borderColor: 'var(--clr-border)' }
-                  }
-                >
-                  {labels[f]}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Payment filter */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            {(['all', 'cash', 'card', 'transfer'] as FilterPayment[]).map((f) => {
-              const labels = { all: 'Todos', cash: 'Efectivo', card: 'Tarjeta', transfer: 'Transfer.' }
-              const isActive = filterPayment === f
-              return (
-                <button
-                  key={f}
-                  onClick={() => setFilterPayment(f)}
-                  className="rounded-full px-3 py-1 text-[12px] font-medium transition-all border"
-                  style={
-                    isActive
-                      ? { background: 'var(--clr-accent)', color: 'var(--clr-bg)', borderColor: 'var(--clr-accent)' }
-                      : { background: 'transparent', color: 'var(--clr-muted)', borderColor: 'var(--clr-border)' }
-                  }
-                >
-                  {labels[f]}
-                </button>
-              )
-            })}
-          </div>
-
-          {hasActiveFilters && (
-            <button
-              onClick={() => { setFilterStatus('all'); setFilterPayment('all'); setSearch('') }}
-              className="text-[11px] flex items-center gap-1 shrink-0"
-              style={{ color: 'var(--clr-primary-text)' }}
+            {/* Filters + Search bar */}
+            <div
+              className="flex flex-col sm:flex-row sm:items-center gap-2 px-5 py-3 border-b"
+              style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-bg)' }}
             >
-              <X size={11} /> Limpiar
-            </button>
-          )}
-        </div>
+              {/* Search */}
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--clr-muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Buscar por producto o ID..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-lg pl-8 pr-8 py-2 text-[13px] border outline-none transition-colors placeholder:text-[var(--clr-muted)]"
+                  style={{
+                    background: 'var(--clr-surface)',
+                    borderColor: 'var(--clr-border)',
+                    color: 'var(--clr-text)',
+                    colorScheme: 'dark',
+                  }}
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2"
+                    style={{ color: 'var(--clr-muted)' }}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
 
-        {/* Sale list */}
-        <div className="p-4 flex flex-col gap-2.5">
-          {loading ? (
-            <>
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-            </>
-          ) : filteredSales.length === 0 ? (
-            <div className="py-14 flex flex-col items-center gap-2">
-              <ShoppingCart size={28} style={{ color: 'var(--clr-muted)' }} />
-              <p className="text-[13px]" style={{ color: 'var(--clr-muted)' }}>
-                {hasActiveFilters ? 'No hay ventas que coincidan con los filtros' : 'No hay ventas registradas'}
-              </p>
+              {/* Status filter pills */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {(['all', 'active', 'voided'] as FilterStatus[]).map((f) => {
+                  const labels = { all: 'Todas', active: 'Activas', voided: 'Anuladas' }
+                  const isActive = filterStatus === f
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => setFilterStatus(f)}
+                      className="rounded-full px-3 py-1 text-[12px] font-medium transition-all border"
+                      style={
+                        isActive
+                          ? { background: 'var(--clr-primary)', color: '#fff', borderColor: 'var(--clr-primary)' }
+                          : { background: 'transparent', color: 'var(--clr-muted)', borderColor: 'var(--clr-border)' }
+                      }
+                    >
+                      {labels[f]}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Payment filter */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {(['all', 'cash', 'card', 'transfer'] as FilterPayment[]).map((f) => {
+                  const labels = { all: 'Todos', cash: 'Efectivo', card: 'Tarjeta', transfer: 'Transfer.' }
+                  const isActive = filterPayment === f
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => setFilterPayment(f)}
+                      className="rounded-full px-3 py-1 text-[12px] font-medium transition-all border"
+                      style={
+                        isActive
+                          ? { background: 'var(--clr-accent)', color: 'var(--clr-bg)', borderColor: 'var(--clr-accent)' }
+                          : { background: 'transparent', color: 'var(--clr-muted)', borderColor: 'var(--clr-border)' }
+                      }
+                    >
+                      {labels[f]}
+                    </button>
+                  )
+                })}
+              </div>
+
               {hasActiveFilters && (
                 <button
                   onClick={() => { setFilterStatus('all'); setFilterPayment('all'); setSearch('') }}
-                  className="text-[12px] underline"
+                  className="text-[11px] flex items-center gap-1 shrink-0"
                   style={{ color: 'var(--clr-primary-text)' }}
                 >
-                  Limpiar filtros
+                  <X size={11} /> Limpiar
                 </button>
               )}
             </div>
-          ) : (
-            paginatedSales.map((sale) => {
-              const isVoided = sale.status === 'voided'
-              return (
-                <div
-                  key={sale.id}
-                  className="flex items-start gap-3 rounded-xl border px-4 py-3.5 transition-colors"
-                  style={{
-                    borderColor: isVoided ? 'var(--clr-border-subtle)' : 'var(--clr-border)',
-                    background: 'var(--clr-surface)',
-                    opacity: isVoided ? 0.6 : 1,
-                  }}
-                >
-                  {/* Status dot */}
-                  <div
-                    className="w-2 h-2 rounded-full shrink-0 mt-[5px]"
-                    style={{ background: isVoided ? 'var(--clr-danger)' : 'var(--clr-success)' }}
-                  />
 
-                  {/* Main info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className="text-[12px] font-medium tabular-nums"
-                        style={{
-                          color: 'var(--clr-muted)',
-                          textDecoration: isVoided ? 'line-through' : 'none',
-                        }}
-                      >
-                        #{sale.id.slice(-6).toUpperCase()}
-                      </span>
-                      <PaymentTag method={sale.paymentMethod} />
-                      {isVoided && <StatusBadge status="voided" />}
-                    </div>
-                    <p
-                      className="text-[13px] mt-1 truncate"
-                      style={{
-                        color: 'var(--clr-text)',
-                        textDecoration: isVoided ? 'line-through' : 'none',
-                      }}
+            {/* Sale list */}
+            <div className="p-4 flex flex-col gap-2.5">
+              {loading ? (
+                <>
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                </>
+              ) : filteredSales.length === 0 ? (
+                <div className="py-14 flex flex-col items-center gap-2">
+                  <ShoppingCart size={28} style={{ color: 'var(--clr-muted)' }} />
+                  <p className="text-[13px]" style={{ color: 'var(--clr-muted)' }}>
+                    {hasActiveFilters ? 'No hay ventas que coincidan con los filtros' : 'No hay ventas registradas'}
+                  </p>
+                  {hasActiveFilters && (
+                    <button
+                      onClick={() => { setFilterStatus('all'); setFilterPayment('all'); setSearch('') }}
+                      className="text-[12px] underline"
+                      style={{ color: 'var(--clr-primary-text)' }}
                     >
-                      {sale.items.map((i, idx) => (
-                        <span key={i.productId}>
-                          <span style={{ fontStyle: 'italic', fontWeight: 500 }}>{i.productName}</span> x{i.quantity}
-                          {idx < sale.items.length - 1 && <span className="mx-1" style={{ color: 'var(--clr-muted)' }}>·</span>}
-                        </span>
-                      ))}
-                    </p>
-                    <p className="text-[11px] mt-1" style={{ color: 'var(--clr-muted)' }}>
-                      {new Date(sale.createdAt).toLocaleDateString('es-AR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  </div>
-
-                  {/* Total + actions */}
-                  <div className="text-right shrink-0">
-                    <p
-                      className="text-[15px] font-semibold tabular-nums"
-                      style={{
-                        color: isVoided ? 'var(--clr-muted)' : 'var(--clr-text)',
-                        textDecoration: isVoided ? 'line-through' : 'none',
-                      }}
-                    >
-                      {config.currency.symbol}{sale.total.toFixed(2)}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1.5 justify-end">
-                      <button
-                        onClick={() => openDetail(sale)}
-                        className="text-[11px] transition-opacity hover:opacity-70 flex items-center gap-1"
-                        style={{ color: 'var(--clr-muted)' }}
-                      >
-                        Detalle
-                      </button>
-                      {!isVoided && isAdmin && (
-                        <button
-                          onClick={() => { setSaleToVoid(sale); setVoidConfirmOpen(true) }}
-                          className="text-[11px] transition-opacity hover:opacity-70"
-                          style={{ color: 'var(--clr-danger-text)' }}
-                        >
-                          Anular
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                      Limpiar filtros
+                    </button>
+                  )}
                 </div>
-              )
-            })
-          )}
-        </div>
+              ) : (
+                paginatedSales.map((sale) => {
+                  const isVoided = sale.status === 'voided'
+                  return (
+                    <div
+                      key={sale.id}
+                      className="flex items-start gap-3 rounded-xl border px-4 py-3.5 transition-colors"
+                      style={{
+                        borderColor: isVoided ? 'var(--clr-border-subtle)' : 'var(--clr-border)',
+                        background: 'var(--clr-surface)',
+                        opacity: isVoided ? 0.6 : 1,
+                      }}
+                    >
+                      {/* Status dot */}
+                      <div
+                        className="w-2 h-2 rounded-full shrink-0 mt-[5px]"
+                        style={{ background: isVoided ? 'var(--clr-danger)' : 'var(--clr-success)' }}
+                      />
 
-        {/* Footer count */}
-        {filteredSales.length > 0 && (
-          <div
-            className="px-5 py-2.5 border-t"
-            style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-bg)' }}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>
-                {filteredSales.length} de {sales.length} venta{sales.length !== 1 ? 's' : ''}
-              </span>
-              <span className="text-[11px] font-medium" style={{ color: 'var(--clr-muted)' }}>
-                {filteredSales.filter((s) => s.status === 'active').length} activas ·{' '}
-                {filteredSales.filter((s) => s.status === 'voided').length} anuladas
-              </span>
+                      {/* Main info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className="text-[12px] font-medium tabular-nums"
+                            style={{
+                              color: 'var(--clr-muted)',
+                              textDecoration: isVoided ? 'line-through' : 'none',
+                            }}
+                          >
+                            #{sale.id.slice(-6).toUpperCase()}
+                          </span>
+                          <PaymentTag method={sale.paymentMethod} />
+                          {isVoided && <StatusBadge status="voided" />}
+                        </div>
+                        <p
+                          className="text-[13px] mt-1 truncate"
+                          style={{
+                            color: 'var(--clr-text)',
+                            textDecoration: isVoided ? 'line-through' : 'none',
+                          }}
+                        >
+                          {sale.items.map((i, idx) => (
+                            <span key={i.productId}>
+                              <span style={{ fontStyle: 'italic', fontWeight: 500 }}>{i.productName}</span> x{i.quantity}
+                              {idx < sale.items.length - 1 && <span className="mx-1" style={{ color: 'var(--clr-muted)' }}>·</span>}
+                            </span>
+                          ))}
+                        </p>
+                        <p className="text-[11px] mt-1" style={{ color: 'var(--clr-muted)' }}>
+                          {new Date(sale.createdAt).toLocaleDateString('es-AR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+
+                      {/* Total + actions */}
+                      <div className="text-right shrink-0">
+                        <p
+                          className="text-[15px] font-semibold tabular-nums"
+                          style={{
+                            color: isVoided ? 'var(--clr-muted)' : 'var(--clr-text)',
+                            textDecoration: isVoided ? 'line-through' : 'none',
+                          }}
+                        >
+                          {config.currency.symbol}{sale.total.toFixed(2)}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1.5 justify-end">
+                          <button
+                            onClick={() => openDetail(sale)}
+                            className="text-[11px] transition-opacity hover:opacity-70 flex items-center gap-1"
+                            style={{ color: 'var(--clr-muted)' }}
+                          >
+                            Detalle
+                          </button>
+                          {!isVoided && isAdmin && (
+                            <button
+                              onClick={() => { setSaleToVoid(sale); setVoidConfirmOpen(true) }}
+                              className="text-[11px] transition-opacity hover:opacity-70"
+                              style={{ color: 'var(--clr-danger-text)' }}
+                            >
+                              Anular
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
             </div>
-            <Pagination page={salePage} totalPages={Math.max(1, Math.ceil(filteredSales.length / salePerPage))} onChange={setSalePage} />
+
+            {/* Footer count */}
+            {filteredSales.length > 0 && (
+              <div
+                className="px-5 py-2.5 border-t"
+                style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-bg)' }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>
+                    {filteredSales.length} de {sales.length} venta{sales.length !== 1 ? 's' : ''}
+                  </span>
+                  <span className="text-[11px] font-medium" style={{ color: 'var(--clr-muted)' }}>
+                    {filteredSales.filter((s) => s.status === 'active').length} activas ·{' '}
+                    {filteredSales.filter((s) => s.status === 'voided').length} anuladas
+                  </span>
+                </div>
+                <Pagination page={salePage} totalPages={Math.max(1, Math.ceil(filteredSales.length / salePerPage))} onChange={setSalePage} />
+              </div>
+            )}
+          </>
+        ) : (
+          /* ── Tab: Venta ── */
+          <div className="p-5 space-y-4">
+            {/* Search + Add row */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="min-w-0 flex-1 flex items-end gap-2">
+                <div className="flex-1">
+                  <SearchSelect
+                    label="Producto"
+                    options={productOptions}
+                    value={selectedProductId}
+                    onChange={setSelectedProductId}
+                    placeholder="Buscar por nombre o código de barras..."
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setScannerOpen(true)}
+                  className="shrink-0 mb-7 flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-dim hover:text-primary-light"
+                  title="Escanear código de barras"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" />
+                    <path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+                    <line x1="7" x2="7" y1="12" y2="12" /><line x1="12" x2="12" y1="12" y2="12" /><line x1="17" x2="17" y1="12" y2="12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="w-full shrink-0 sm:w-24">
+                <Input ref={quantityRef} label="Cant." type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+              </div>
+              <div className="shrink-0 sm:mb-[23px]">
+                <Button onClick={addToCart} disabled={!selectedProductId}><Plus size={16} /> Agregar</Button>
+              </div>
+            </div>
+
+            {/* Product grid */}
+            <div>
+              {availableProducts.length === 0 ? (
+                <p className="text-center text-[13px] text-muted py-8">No hay productos disponibles para la venta</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                    {paginatedProducts.map((p) => {
+                      const inCart = cart.find((c) => c.productId === p.id)
+                      const cartQty = inCart ? inCart.quantity : 0
+                      const soldOut = cartQty >= p.stock
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          disabled={soldOut}
+                          onClick={() => quickAdd(p.id)}
+                          className="rounded-xl border border-border bg-surface p-3 text-left transition-colors hover:bg-primary-dim disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          {p.images?.[0] ? (
+                            <Img src={p.images[0]} alt="" className="h-20 w-full rounded-lg object-cover mb-2" skeleton="rounded-lg" />
+                          ) : (
+                            <div className="h-20 w-full rounded-lg bg-surface mb-2 flex items-center justify-center border border-border">
+                              <Package size={20} className="text-muted" />
+                            </div>
+                          )}
+                          <p className="text-[13px] font-medium text-text truncate">{p.name}</p>
+                          <p className="text-[12px] text-accent font-semibold mt-1">{config.currency.symbol}{p.price.toFixed(2)}</p>
+                          <p className="text-[10px] text-muted mt-0.5">{p.stock} uds.</p>
+                          {inCart && (
+                            <p className="text-[10px] text-primary-light mt-0.5">{cartQty} en carrito</p>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {availableProducts.length > productsPerPage && (
+                    <div className="mt-3">
+                      <Pagination
+                        page={productPage}
+                        totalPages={Math.max(1, Math.ceil(availableProducts.length / productsPerPage))}
+                        onChange={setProductPage}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Ver carrito banner */}
+            {cart.length > 0 && (
+              <div
+                className="flex items-center justify-between rounded-xl border px-4 py-3"
+                style={{
+                  borderColor: 'var(--clr-border)',
+                  background: 'var(--clr-primary-dim)',
+                }}
+              >
+                <span className="text-[12px]" style={{ color: 'var(--clr-text)' }}>
+                  <span className="font-medium">{cart.length} producto{cart.length !== 1 ? 's' : ''}</span> · {config.currency.symbol}{cartTotal.toFixed(2)}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={clearCart}
+                    className="text-[11px] underline transition-colors"
+                    style={{ color: 'var(--clr-muted)' }}
+                  >
+                    Vaciar
+                  </button>
+                  <Button variant="gold" size="sm" onClick={() => setCartModalOpen(true)}>
+                    <ShoppingCart size={13} /> Ver carrito
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* ── Modal Nueva Venta ── */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nueva Venta" size="lg">
-        <Formik
-          innerRef={saleFormikRef}
-          initialValues={{ paymentMethod: 'cash' as PaymentMethod }}
-          validationSchema={saleSchema}
-          validate={() => {
-            if (cart.length === 0) return { cart: 'Agregá al menos un producto' }
-            return {}
-          }}
-          onSubmit={() => {
-            setPreviewPaymentMethod(saleFormikRef.current?.values.paymentMethod ?? 'cash')
-            setPreviewOpen(true)
-          }}
-        >
-          {({ errors, submitForm }) => (
-            <Form>
-              <div className="space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="min-w-0 flex-1 flex items-end gap-2">
-                    <div className="flex-1">
-                      <SearchSelect
-                        label="Producto"
-                        options={productOptions}
-                        value={selectedProductId}
-                        onChange={setSelectedProductId}
-                        placeholder="Buscar por nombre o código de barras..."
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setScannerOpen(true)}
-                      className="shrink-0 mb-7 flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary-dim hover:text-primary-light"
-                      title="Escanear código de barras"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" />
-                        <path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" />
-                        <line x1="7" x2="7" y1="12" y2="12" /><line x1="12" x2="12" y1="12" y2="12" /><line x1="17" x2="17" y1="12" y2="12" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="w-full shrink-0 sm:w-24">
-                    <Input ref={quantityRef} label="Cant." type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-                  </div>
-                  <div className="shrink-0 sm:mb-[23px]">
-                    <Button onClick={addToCart} disabled={!selectedProductId}><Plus size={16} /> Agregar</Button>
-                  </div>
-                </div>
-
-                {cart.length > 0 && (
-                  <div
-                    className="rounded-xl border overflow-hidden"
-                    style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-surface)' }}
-                  >
-                    <div
-                      className="px-4 py-2 text-[10px] font-semibold uppercase tracking-widest border-b"
-                      style={{ color: 'var(--clr-muted)', borderColor: 'var(--clr-border)' }}
-                    >
-                      Carrito
-                    </div>
-                    {cart.map((item) => (
-                      <div
-                        key={item.productId}
-                        className="flex items-center justify-between border-b px-4 py-2.5 last:border-0"
-                        style={{ borderColor: 'var(--clr-border-subtle)' }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium truncate" style={{ color: 'var(--clr-text)' }}>{item.productName}</p>
-                          <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)} c/u</p>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Button variant="gold-outline" size="sm" type="button" onClick={() => updateCartQty(item.productId, -1)}><Minus size={14} /></Button>
-                          <span className="w-8 text-center text-[13px] font-medium" style={{ color: 'var(--clr-text)' }}>{item.quantity}</span>
-                          <Button variant="gold" size="sm" type="button" onClick={() => updateCartQty(item.productId, 1)}><Plus size={14} /></Button>
-                          <Button variant="surface" size="sm" type="button" onClick={() => removeFromCart(item.productId)}><Trash2 size={14} style={{ color: 'var(--clr-danger-text)' }} /></Button>
-                        </div>
-                      </div>
-                    ))}
-                    <div
-                      className="flex items-center justify-between px-4 py-3 border-t"
-                      style={{ borderColor: 'var(--clr-border)' }}
-                    >
-                      <span className="text-[13px] font-semibold" style={{ color: 'var(--clr-text)' }}>Total</span>
-                      <span className="text-[18px] font-bold" style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{cartTotal.toFixed(2)}</span>
-                    </div>
-                  </div>
-                )}
-
-                <SelectField
-                  name="paymentMethod"
-                  label="Método de Pago"
-                  options={[
-                    { value: 'cash', label: 'Efectivo' },
-                    { value: 'card', label: 'Tarjeta' },
-                    { value: 'transfer', label: 'Transferencia' },
-                  ]}
-                />
-
-                {(errors as any).cart && (
-                  <p className="text-[11px]" style={{ color: 'var(--clr-danger-text)' }}>{(errors as any).cart}</p>
-                )}
+      {/* ── Modal Carrito ── */}
+      <Modal open={cartModalOpen} onClose={() => setCartModalOpen(false)} title="Carrito" size="lg">
+        <div className="space-y-4">
+          {cart.map((item) => (
+            <div
+              key={item.productId}
+              className="flex items-center justify-between border-b pb-2.5 last:border-0"
+              style={{ borderColor: 'var(--clr-border-subtle)' }}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium" style={{ color: 'var(--clr-text)' }}>{item.productName}</p>
+                <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)} c/u</p>
               </div>
-
-              <div className="mt-6 flex justify-end gap-3">
-                <Button variant="surface" type="button" onClick={() => setModalOpen(false)}>Cancelar</Button>
-                <Button type="button" onClick={() => submitForm()} disabled={cart.length === 0}>
-                  Previsualizar ({config.currency.symbol}{cartTotal.toFixed(2)})
-                </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button variant="gold-outline" size="sm" type="button" onClick={() => updateCartQty(item.productId, -1)}><Minus size={14} /></Button>
+                <span className="w-8 text-center text-[13px] font-medium" style={{ color: 'var(--clr-text)' }}>{item.quantity}</span>
+                <Button variant="gold" size="sm" type="button" onClick={() => updateCartQty(item.productId, 1)}><Plus size={14} /></Button>
+                <Button variant="surface" size="sm" type="button" onClick={() => removeFromCart(item.productId)}><Trash2 size={14} style={{ color: 'var(--clr-danger-text)' }} /></Button>
               </div>
-            </Form>
+            </div>
+          ))}
+
+          {cart.length === 0 && (
+            <p className="text-center text-[13px] text-muted py-4">El carrito está vacío</p>
           )}
-        </Formik>
+
+          <div
+            className="flex items-center justify-between border-t pt-3"
+            style={{ borderColor: 'var(--clr-border)' }}
+          >
+            <span className="text-[13px] font-semibold" style={{ color: 'var(--clr-text)' }}>Total</span>
+            <span className="text-[18px] font-bold" style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{cartTotal.toFixed(2)}</span>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted block mb-1">
+              Método de Pago
+            </label>
+            <select
+              value={previewPaymentMethod}
+              onChange={(e) => setPreviewPaymentMethod(e.target.value as PaymentMethod)}
+              className="h-9 w-full appearance-none rounded-lg border border-border bg-surface px-3 text-[13px] text-text transition-colors focus:border-border-strong focus:outline-none"
+            >
+              <option value="cash" className="bg-card text-text">Efectivo</option>
+              <option value="card" className="bg-card text-text">Tarjeta</option>
+              <option value="transfer" className="bg-card text-text">Transferencia</option>
+            </select>
+          </div>
+
+          {previewPaymentMethod === 'cash' && (
+            <div>
+              <label className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted block mb-1">
+                Importe recibido
+              </label>
+              <div className="relative">
+                <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={cashAmount}
+                  onChange={(e) => setCashAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full rounded-lg border border-border bg-surface py-2 pl-8 pr-3 text-[13px] text-text placeholder:text-muted transition-colors focus:border-border-strong focus:outline-none"
+                />
+              </div>
+              {cashAmount && parseFloat(cashAmount) > 0 && (
+                <div
+                  className="flex items-center justify-between mt-2 px-3 py-2 rounded-lg border"
+                  style={{
+                    borderColor: cambio > 0 ? 'var(--clr-success)' : 'var(--clr-border)',
+                    background: cambio > 0 ? 'var(--clr-success-dim)' : 'transparent',
+                  }}
+                >
+                  <span className="text-[12px] font-medium" style={{ color: 'var(--clr-text)' }}>Vuelto</span>
+                  <span className="text-[15px] font-bold" style={{ color: cambio > 0 ? 'var(--clr-success-text)' : 'var(--clr-text)' }}>
+                    {config.currency.symbol}{cambio.toFixed(2)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="surface" type="button" onClick={() => setCartModalOpen(false)}>Cerrar</Button>
+          <Button type="button" onClick={() => { setCartModalOpen(false); setPreviewOpen(true) }} disabled={cart.length === 0}>
+            Previsualizar ({config.currency.symbol}{cartTotal.toFixed(2)})
+          </Button>
+        </div>
       </Modal>
 
       {/* ── Modal Preview ── */}
       <Modal open={previewOpen} onClose={() => setPreviewOpen(false)} title="Previsualizar Venta" size="lg">
         <div className="space-y-5">
-          <div className="border-b pb-4" style={{ borderColor: 'var(--clr-border)' }}>
-            <h3 className="text-[15px] font-bold" style={{ fontFamily: '"Playfair Display", serif', color: 'var(--clr-text)' }}>{config.storeName}</h3>
-            <p className="text-[12px]" style={{ color: 'var(--clr-muted)' }}>Comprobante de venta</p>
-            <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{new Date().toLocaleDateString('es-ES', { dateStyle: 'long' })}</p>
+          <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: 'var(--clr-border)' }}>
+            <MarelyLogo width={180} />
+            <div className="text-right">
+              <p className="text-[12px]" style={{ color: 'var(--clr-muted)' }}>Comprobante de venta</p>
+              <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{new Date().toLocaleDateString('es-ES', { dateStyle: 'long' })}</p>
+            </div>
           </div>
 
           <table className="w-full text-[12px]">

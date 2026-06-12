@@ -93,20 +93,20 @@ export function Settings() {
   return (
     <div className="space-y-4">
       {/* Tabs */}
-      <div className="flex gap-1 rounded-lg border border-border bg-surface p-1">
+      <div className="flex gap-1 rounded-lg border border-border bg-surface p-1 w-fit">
         <button
           onClick={() => setSearchParams({ tab: 'users' })}
-          className={`flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-medium transition-colors ${activeTab === 'users' ? 'bg-primary-dim text-primary-light' : 'text-muted hover:text-text'
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${activeTab === 'users' ? 'bg-primary-dim text-primary-light' : 'text-muted hover:text-muted-light'
             }`}
         >
-          <Users size={15} /> Usuarios
+          <Users size={14} /> Usuarios
         </button>
         <button
           onClick={() => setSearchParams({ tab: 'backup' })}
-          className={`flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-medium transition-colors ${activeTab === 'backup' ? 'bg-primary-dim text-primary-light' : 'text-muted hover:text-text'
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${activeTab === 'backup' ? 'bg-primary-dim text-primary-light' : 'text-muted hover:text-muted-light'
             }`}
         >
-          <Database size={15} /> Respaldo y Restauración
+          <Database size={14} /> Respaldo y Restauración
         </button>
       </div>
 
