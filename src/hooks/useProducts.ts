@@ -26,7 +26,7 @@ export function useProducts() {
     const { data, error: err } = await supabase
       .from('products')
       .select('*')
-      .order('created_at')
+      .order('created_at', { ascending: false })
     if (err) {
       setError(err.message)
     } else if (data) {
