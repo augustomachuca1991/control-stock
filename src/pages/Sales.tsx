@@ -273,6 +273,7 @@ export function Sales() {
     const newItem: CartItem = {
       productId: product.id,
       productName: product.name,
+      productDescription: product.description,
       quantity: existing ? existing.quantity + qty : qty,
       unitPrice: product.price,
       maxStock: product.stock,
@@ -293,6 +294,18 @@ export function Sales() {
 
   const handleConfirmSale = useCallback(async () => {
     setConfirming(true)
+    if (previewPaymentMethod === 'cash') {
+      if (!cashAmount || parseFloat(cashAmount) <= 0) {
+        toast.error('Ingresá el importe recibido en efectivo')
+        setConfirming(false)
+        return
+      }
+      if (parseFloat(cashAmount) < cartTotal) {
+        toast.error(`Faltan ${config.currency.symbol}${(cartTotal - parseFloat(cashAmount)).toFixed(2)} para completar el pago`)
+        setConfirming(false)
+        return
+      }
+    }
     const paymentMethod = previewPaymentMethod
     for (const item of cart) {
       const product = getProductById(item.productId)
@@ -311,6 +324,7 @@ export function Sales() {
       items: cart.map((c) => ({
         productId: c.productId,
         productName: c.productName,
+        productDescription: c.productDescription,
         quantity: c.quantity,
         unitPrice: c.unitPrice,
       })),
@@ -326,7 +340,7 @@ export function Sales() {
     setPreviewOpen(false)
     clearCart()
     if (sale) setReceiptOpen(true)
-  }, [cart, createSale, reduceStock, getProductById, clearCart])
+  }, [cart, createSale, reduceStock, getProductById, clearCart, previewPaymentMethod, cashAmount, cartTotal])
 
   const handleVoidSale = useCallback(async () => {
     if (!saleToVoid) return
@@ -378,6 +392,7 @@ export function Sales() {
     addToCartStore({
       productId: product.id,
       productName: product.name,
+      productDescription: product.description,
       quantity: existing ? existing.quantity + 1 : 1,
       unitPrice: product.price,
       maxStock: product.stock,
@@ -385,10 +400,13 @@ export function Sales() {
     toast.success(`${product.name} agregado al carrito`)
   }, [getProductById, cart, addToCartStore])
 
-  const cambio = useMemo(() => {
+  const cashDiff = useMemo(() => {
     if (previewPaymentMethod !== 'cash' || !cashAmount) return 0
-    return Math.max(0, parseFloat(cashAmount) - cartTotal)
+    return parseFloat(cashAmount) - cartTotal
   }, [previewPaymentMethod, cashAmount, cartTotal])
+
+  const cambio = useMemo(() => Math.max(0, cashDiff), [cashDiff])
+  const faltante = useMemo(() => Math.abs(Math.min(0, cashDiff)), [cashDiff])
 
   const hasActiveFilters = filterStatus !== 'all' || filterPayment !== 'all' || search.trim() !== ''
 
@@ -766,7 +784,7 @@ export function Sales() {
                           type="button"
                           disabled={soldOut}
                           onClick={() => quickAdd(p.id)}
-                          className="rounded-xl border border-border bg-surface p-3 text-left transition-colors hover:bg-primary-dim disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="relative rounded-xl border border-border bg-surface p-3 text-left transition-colors hover:bg-primary-dim disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                           {p.images?.[0] ? (
                             <Img src={p.images[0]} alt="" className="h-20 w-full rounded-lg object-cover mb-2" skeleton="rounded-lg" />
@@ -774,6 +792,11 @@ export function Sales() {
                             <div className="h-20 w-full rounded-lg bg-surface mb-2 flex items-center justify-center border border-border">
                               <Package size={20} className="text-muted" />
                             </div>
+                          )}
+                          {inCart && (
+                            <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-bold text-white shadow-sm">
+                              {cartQty}
+                            </span>
                           )}
                           <p className="text-[13px] font-medium text-text truncate">{p.name}</p>
                           <p className="text-[12px] text-accent font-semibold mt-1">{config.currency.symbol}{p.price.toFixed(2)}</p>
@@ -839,6 +862,7 @@ export function Sales() {
             >
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-medium" style={{ color: 'var(--clr-text)' }}>{item.productName}</p>
+                {item.productDescription && <p className="text-[11px] text-muted mt-0.5 leading-snug">{item.productDescription}</p>}
                 <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)} c/u</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -898,14 +922,25 @@ export function Sales() {
                 <div
                   className="flex items-center justify-between mt-2 px-3 py-2 rounded-lg border"
                   style={{
-                    borderColor: cambio > 0 ? 'var(--clr-success)' : 'var(--clr-border)',
-                    background: cambio > 0 ? 'var(--clr-success-dim)' : 'transparent',
+                    borderColor: faltante > 0 ? 'var(--clr-danger)' : cambio > 0 ? 'var(--clr-success)' : 'var(--clr-border)',
+                    background: faltante > 0 ? 'var(--clr-danger-dim)' : cambio > 0 ? 'var(--clr-success-dim)' : 'transparent',
                   }}
                 >
-                  <span className="text-[12px] font-medium" style={{ color: 'var(--clr-text)' }}>Vuelto</span>
-                  <span className="text-[15px] font-bold" style={{ color: cambio > 0 ? 'var(--clr-success-text)' : 'var(--clr-text)' }}>
-                    {config.currency.symbol}{cambio.toFixed(2)}
-                  </span>
+                  {faltante > 0 ? (
+                    <>
+                      <span className="text-[12px] font-medium" style={{ color: 'var(--clr-danger-text)' }}>Faltante</span>
+                      <span className="text-[15px] font-bold" style={{ color: 'var(--clr-danger-text)' }}>
+                        {config.currency.symbol}{faltante.toFixed(2)}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-[12px] font-medium" style={{ color: 'var(--clr-text)' }}>Vuelto</span>
+                      <span className="text-[15px] font-bold" style={{ color: cambio > 0 ? 'var(--clr-success-text)' : 'var(--clr-text)' }}>
+                        {config.currency.symbol}{cambio.toFixed(2)}
+                      </span>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -914,7 +949,19 @@ export function Sales() {
 
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="surface" type="button" onClick={() => setCartModalOpen(false)}>Cerrar</Button>
-          <Button type="button" onClick={() => { setCartModalOpen(false); setPreviewOpen(true) }} disabled={cart.length === 0}>
+          <Button type="button" onClick={() => {
+            if (previewPaymentMethod === 'cash') {
+              if (!cashAmount || parseFloat(cashAmount) <= 0) {
+                toast.error('Ingresá el importe recibido en efectivo')
+                return
+              }
+              if (faltante > 0) {
+                toast.error(`Faltan ${config.currency.symbol}${faltante.toFixed(2)} para completar el pago`)
+                return
+              }
+            }
+            setCartModalOpen(false); setPreviewOpen(true)
+          }} disabled={cart.length === 0}>
             Previsualizar ({config.currency.symbol}{cartTotal.toFixed(2)})
           </Button>
         </div>
@@ -943,7 +990,10 @@ export function Sales() {
             <tbody>
               {cart.map((item) => (
                 <tr key={item.productId} className="border-b" style={{ borderColor: 'var(--clr-border-subtle)' }}>
-                  <td className="py-2.5" style={{ color: 'var(--clr-text)' }}>{item.productName}</td>
+                  <td className="py-2.5" style={{ color: 'var(--clr-text)' }}>
+                    <p>{item.productName}</p>
+                    {item.productDescription && <p className="text-[10px] text-muted mt-0.5 leading-snug">{item.productDescription}</p>}
+                  </td>
                   <td className="py-2.5 text-right" style={{ color: 'var(--clr-muted-light)' }}>{item.quantity}</td>
                   <td className="py-2.5 text-right" style={{ color: 'var(--clr-muted-light)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)}</td>
                   <td className="py-2.5 text-right font-semibold" style={{ color: 'var(--clr-text)' }}>{config.currency.symbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
@@ -1003,7 +1053,10 @@ export function Sales() {
               <tbody>
                 {lastSale.items.map((item) => (
                   <tr key={item.productId} className="border-b" style={{ borderColor: 'var(--clr-border-subtle)' }}>
-                    <td className="py-2.5" style={{ color: 'var(--clr-text)' }}>{item.productName}</td>
+                    <td className="py-2.5" style={{ color: 'var(--clr-text)' }}>
+                      <p>{item.productName}</p>
+                      {item.productDescription && <p className="text-[10px] text-muted mt-0.5 leading-snug">{item.productDescription}</p>}
+                    </td>
                     <td className="py-2.5 text-right" style={{ color: 'var(--clr-muted-light)' }}>{item.quantity}</td>
                     <td className="py-2.5 text-right" style={{ color: 'var(--clr-muted-light)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)}</td>
                     <td className="py-2.5 text-right font-semibold" style={{ color: 'var(--clr-text)' }}>{config.currency.symbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
@@ -1079,6 +1132,7 @@ export function Sales() {
                       </td>
                       <td className="py-2 pr-2" style={{ color: 'var(--clr-text)' }}>
                         <p className="font-medium">{item.productName}</p>
+                        {product?.description && <p className="text-[10px] text-muted mt-0.5 leading-snug">{product.description}</p>}
                         {product?.barcode && <code className="text-[10px]" style={{ color: 'var(--clr-muted)' }}>{product.barcode}</code>}
                       </td>
                       <td className="py-2 pr-2 text-right" style={{ color: 'var(--clr-muted-light)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)}</td>

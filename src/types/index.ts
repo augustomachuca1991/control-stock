@@ -25,6 +25,7 @@ export interface Product {
 export interface SaleItem {
   productId: string
   productName: string
+  productDescription?: string
   quantity: number
   unitPrice: number
 }

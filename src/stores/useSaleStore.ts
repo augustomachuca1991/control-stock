@@ -4,6 +4,7 @@ import type { Sale, SaleItem, PaymentMethod } from '../types'
 export interface CartItem {
   productId: string
   productName: string
+  productDescription: string
   quantity: number
   unitPrice: number
   maxStock: number
