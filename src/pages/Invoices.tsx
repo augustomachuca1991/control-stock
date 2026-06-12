@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { Upload, FileText, Loader2, CheckCircle2, AlertCircle, X, Package, ScanLine } from 'lucide-react'
+import { Upload, FileText, Loader2, CheckCircle2, AlertCircle, X, Package, ScanLine, History, Search } from 'lucide-react'
 import { Pagination } from '../components/ui/Pagination'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -96,6 +96,7 @@ export function Invoices() {
   const [categoryError, setCategoryError] = useState('')
   const [fileHash, setFileHash] = useState('')
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'analisis' | 'historico'>('analisis')
 
   const { products, add: addProduct, update: updateProduct, increaseStock } = useProducts()
   const { add: addPurchase } = usePurchases()
@@ -320,11 +321,35 @@ export function Invoices() {
 
   return (
     <div className="space-y-4">
-      {/* ─── Card principal ─── */}
-      <Card
-        title="Factura"
-        subtitle="Subí una foto o PDF de la factura para analizarla automáticamente"
-      >
+      {/* Tab bar */}
+      <div className="flex gap-1 rounded-lg border border-border bg-surface p-1 w-fit">
+        <button
+          onClick={() => setActiveTab('analisis')}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${activeTab === 'analisis'
+            ? 'bg-primary-dim text-primary-light'
+            : 'text-muted hover:text-muted-light'
+            }`}
+        >
+          <Search size={14} /> Análisis
+        </button>
+        <button
+          onClick={() => setActiveTab('historico')}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${activeTab === 'historico'
+            ? 'bg-primary-dim text-primary-light'
+            : 'text-muted hover:text-muted-light'
+            }`}
+        >
+          <History size={14} /> Histórico
+        </button>
+      </div>
+
+      {activeTab === 'analisis' && (
+        <>
+          {/* ─── Card principal ─── */}
+          <Card
+            title="Factura"
+            subtitle="Subí una foto o PDF de la factura para analizarla automáticamente"
+          >
         {/* Stepper siempre visible */}
         <Stepper step={step} />
 
@@ -626,71 +651,77 @@ export function Invoices() {
           </div>
         )}
       </Modal>
+        </>
+      )}
 
-      {/* ─── Card historial ─── */}
-      <Card title="Historial" subtitle="Facturas procesadas">
-        {invoicesLoading ? (
-          <div className="divide-y divide-border/50 rounded-lg border border-border">
-            {Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)}
-          </div>
-        ) : invoices.length === 0 ? (
-          <p className="py-6 text-center text-[13px] text-muted">Todavía no se procesaron facturas</p>
-        ) : (
-          <div className="space-y-2">
-            {paginatedInvoices.map((inv) => (
-              <div
-                key={inv.id}
-                className="flex items-start gap-3 rounded-lg border border-border bg-surface-dim p-3"
-              >
-                {/* Thumb */}
-                {inv.imageUrl ? (
-                  <button type="button" onClick={() => setPreviewImage(inv.imageUrl!)} className="shrink-0">
-                    <Img
-                      src={inv.imageUrl}
-                      alt=""
-                      className="h-14 w-14 rounded-lg border border-border object-cover"
-                      skeleton="rounded-lg"
-                    />
-                  </button>
-                ) : (
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-accent/10">
-                    <FileText size={20} className="text-accent" />
-                  </div>
-                )}
-
-                {/* Info */}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium text-text">{inv.fileName}</p>
-                  <p className="mt-0.5 text-[11px] text-muted">
-                    {new Date(inv.createdAt).toLocaleDateString('es-ES', { dateStyle: 'long' })}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-muted">
-                    {inv.items.length} artículo{inv.items.length !== 1 ? 's' : ''}
-                  </p>
-                  {inv.userEmail && (
-                    <p className="mt-0.5 text-[10px] text-muted">Registró: {inv.userEmail}</p>
-                  )}
-                </div>
-
-                {/* Totales */}
-                <div className="shrink-0 text-right">
-                  <p className="text-[15px] font-medium text-accent">
-                    {config.currency.symbol}{inv.total.toFixed(2)}
-                  </p>
-                  {inv.iva > 0 && (
-                    <p className="text-[10px] text-muted">IVA {config.currency.symbol}{inv.iva.toFixed(2)}</p>
-                  )}
-                  {inv.iibb > 0 && (
-                    <p className="text-[10px] text-muted">IIBB {config.currency.symbol}{inv.iibb.toFixed(2)}</p>
-                  )}
-                  <Badge variant="success">Procesada</Badge>
-                </div>
+      {activeTab === 'historico' && (
+        <>
+          {/* ─── Card historial ─── */}
+          <Card title="Historial" subtitle="Facturas procesadas">
+            {invoicesLoading ? (
+              <div className="divide-y divide-border/50 rounded-lg border border-border">
+                {Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)}
               </div>
-            ))}
-          </div>
-        )}
-        <Pagination page={invPage} totalPages={Math.max(1, Math.ceil(invoices.length / invPerPage))} onChange={setInvPage} totalItems={invoices.length} />
-      </Card>
+            ) : invoices.length === 0 ? (
+              <p className="py-6 text-center text-[13px] text-muted">Todavía no se procesaron facturas</p>
+            ) : (
+              <div className="space-y-2">
+                {paginatedInvoices.map((inv) => (
+                  <div
+                    key={inv.id}
+                    className="flex items-start gap-3 rounded-lg border border-border bg-surface-dim p-3"
+                  >
+                    {/* Thumb */}
+                    {inv.imageUrl ? (
+                      <button type="button" onClick={() => setPreviewImage(inv.imageUrl!)} className="shrink-0">
+                        <Img
+                          src={inv.imageUrl}
+                          alt=""
+                          className="h-14 w-14 rounded-lg border border-border object-cover"
+                          skeleton="rounded-lg"
+                        />
+                      </button>
+                    ) : (
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-accent/10">
+                        <FileText size={20} className="text-accent" />
+                      </div>
+                    )}
+
+                    {/* Info */}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-medium text-text">{inv.fileName}</p>
+                      <p className="mt-0.5 text-[11px] text-muted">
+                        {new Date(inv.createdAt).toLocaleDateString('es-ES', { dateStyle: 'long' })}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-muted">
+                        {inv.items.length} artículo{inv.items.length !== 1 ? 's' : ''}
+                      </p>
+                      {inv.userEmail && (
+                        <p className="mt-0.5 text-[10px] text-muted">Registró: {inv.userEmail}</p>
+                      )}
+                    </div>
+
+                    {/* Totales */}
+                    <div className="shrink-0 text-right">
+                      <p className="text-[15px] font-medium text-accent">
+                        {config.currency.symbol}{inv.total.toFixed(2)}
+                      </p>
+                      {inv.iva > 0 && (
+                        <p className="text-[10px] text-muted">IVA {config.currency.symbol}{inv.iva.toFixed(2)}</p>
+                      )}
+                      {inv.iibb > 0 && (
+                        <p className="text-[10px] text-muted">IIBB {config.currency.symbol}{inv.iibb.toFixed(2)}</p>
+                      )}
+                      <Badge variant="success">Procesada</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Pagination page={invPage} totalPages={Math.max(1, Math.ceil(invoices.length / invPerPage))} onChange={setInvPage} totalItems={invoices.length} />
+          </Card>
+        </>
+      )}
 
       {/* ─── Modal imagen ampliada ─── */}
       {previewImage && (
