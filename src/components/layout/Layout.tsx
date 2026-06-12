@@ -4,7 +4,7 @@ import { Toaster } from 'sonner'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { Breadcrumbs } from '../ui/Breadcrumbs'
-import { NewVersionBanner } from '../ui/NewVersionBanner'
+
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -16,7 +16,6 @@ export function Layout() {
       <div className="flex h-screen flex-1 flex-col min-w-0">
         <Header onToggleSidebar={() => setSidebarOpen((v) => !v)} />
         <main className="flex-1 overflow-y-auto bg-bg p-4 md:p-6">
-          <NewVersionBanner />
           <Breadcrumbs />
           <Outlet />
         </main>

@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     tailwindcss(),
     VitePWA({
-      registerType: "prompt",
+      registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "icon-source.svg", "icon-192.png", "icon-512.png"],
       manifest: {
         name: "Marely",
