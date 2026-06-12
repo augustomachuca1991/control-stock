@@ -299,7 +299,7 @@ export function Purchases() {
             : 'text-muted hover:text-muted-light'
             }`}
         >
-          <AlertTriangle size={14} /> Por Reponer ({lowStockProducts.length})
+          <AlertTriangle size={14} /> Reponer ({lowStockProducts.length})
         </button>
         <button
           onClick={() => handleTabChange('new')}
@@ -308,7 +308,7 @@ export function Purchases() {
             : 'text-muted hover:text-muted-light'
             }`}
         >
-          <Package size={14} /> Nuevo Ingreso
+          <Package size={14} /> Ingreso
         </button>
       </div>
 
@@ -417,11 +417,10 @@ export function Purchases() {
                     <button
                       key={page}
                       onClick={() => setReorderPage(page)}
-                      className={`flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-medium transition-colors ${
-                        page === reorderPage
-                          ? 'bg-primary-dim text-primary-light'
-                          : 'text-muted hover:bg-primary-dim/50 hover:text-muted-light'
-                      }`}
+                      className={`flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-medium transition-colors ${page === reorderPage
+                        ? 'bg-primary-dim text-primary-light'
+                        : 'text-muted hover:bg-primary-dim/50 hover:text-muted-light'
+                        }`}
                     >
                       {page}
                     </button>
