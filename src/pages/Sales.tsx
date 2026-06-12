@@ -1,63 +1,32 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import { Plus, Minus, Trash2, FileText, AlertCircle, ShoppingCart, Search, X, Package, Download, History, DollarSign } from 'lucide-react'
+import { Plus, ShoppingCart, Search, X, Package, History, Download } from 'lucide-react'
 import { Pagination } from '../components/ui/Pagination'
 import { BarcodeScanner } from '../components/ui/BarcodeScanner'
 import { exportToXLSX, type ExportColumn } from '../lib/export'
 import { toast } from 'sonner'
 import { Button } from '../components/ui/Button'
-import { Modal } from '../components/ui/Modal'
 import { SearchSelect } from '../components/ui/SearchSelect'
 import { Input } from '../components/ui/Input'
 import { Img } from '../components/ui/Img'
-import MarelyLogo from '../components/ui/MarelyLogo'
 import { SkeletonRow } from '../components/ui/Skeleton'
+import { StatusBadge, PaymentTag, paymentLabels } from './sales/salesComponents'
+import { CartModal } from './sales/CartModal'
+import { PreviewModal } from './sales/PreviewModal'
+import { ReceiptModal } from './sales/ReceiptModal'
+import { DetailModal } from './sales/DetailModal'
+import { VoidConfirmModal } from './sales/VoidConfirmModal'
 import { useProductStore } from '../stores/useProductStore'
 import { useSaleStore } from '../stores/useSaleStore'
 import { useSales } from '../hooks/useSales'
 import { useProducts } from '../hooks/useProducts'
 import { supabase } from '../lib/supabaseClient'
-import type { Sale, SaleStatus, PaymentMethod } from '../types'
+import type { Sale, PaymentMethod } from '../types'
 import type { CartItem } from '../stores/useSaleStore'
 import { config } from '../config'
 import { useAuth } from '../contexts/AuthContext'
 
 type FilterStatus = 'all' | 'active' | 'voided'
 type FilterPayment = 'all' | PaymentMethod
-
-const paymentLabels: Record<PaymentMethod, string> = {
-  cash: 'Efectivo',
-  card: 'Tarjeta',
-  transfer: 'Transferencia',
-}
-
-function StatusBadge({ status }: { status: SaleStatus }) {
-  if (status === 'voided')
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-danger-dim px-2 py-0.5 text-[11px] font-medium text-danger-text">
-        <span className="h-1.5 w-1.5 rounded-full bg-danger-text" />
-        Anulada
-      </span>
-    )
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-success-dim px-2 py-0.5 text-[11px] font-medium text-success-text">
-      <span className="h-1.5 w-1.5 rounded-full bg-success-text" />
-      Activa
-    </span>
-  )
-}
-
-function PaymentTag({ method }: { method: PaymentMethod }) {
-  const styles: Record<PaymentMethod, string> = {
-    cash: 'bg-success-dim text-success-text',
-    card: 'bg-primary-dim text-primary-text',
-    transfer: 'bg-warning-dim text-warning-text',
-  }
-  return (
-    <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-medium ${styles[method]}`}>
-      {paymentLabels[method]}
-    </span>
-  )
-}
 
 export function Sales() {
   const { isAdmin } = useAuth()
@@ -851,373 +820,64 @@ export function Sales() {
         )}
       </div>
 
-      {/* ── Modal Carrito ── */}
-      <Modal open={cartModalOpen} onClose={() => setCartModalOpen(false)} title="Carrito" size="lg">
-        <div className="space-y-4">
-          {cart.map((item) => (
-            <div
-              key={item.productId}
-              className="flex items-center justify-between border-b pb-2.5 last:border-0"
-              style={{ borderColor: 'var(--clr-border-subtle)' }}
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium" style={{ color: 'var(--clr-text)' }}>{item.productName}</p>
-                {item.productDescription && <p className="text-[11px] text-muted mt-0.5 leading-snug">{item.productDescription}</p>}
-                <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)} c/u</p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Button variant="gold-outline" size="sm" type="button" onClick={() => updateCartQty(item.productId, -1)}><Minus size={14} /></Button>
-                <span className="w-8 text-center text-[13px] font-medium" style={{ color: 'var(--clr-text)' }}>{item.quantity}</span>
-                <Button variant="gold" size="sm" type="button" onClick={() => updateCartQty(item.productId, 1)}><Plus size={14} /></Button>
-                <Button variant="surface" size="sm" type="button" onClick={() => removeFromCart(item.productId)}><Trash2 size={14} style={{ color: 'var(--clr-danger-text)' }} /></Button>
-              </div>
-            </div>
-          ))}
-
-          {cart.length === 0 && (
-            <p className="text-center text-[13px] text-muted py-4">El carrito está vacío</p>
-          )}
-
-          <div
-            className="flex items-center justify-between border-t pt-3"
-            style={{ borderColor: 'var(--clr-border)' }}
-          >
-            <span className="text-[13px] font-semibold" style={{ color: 'var(--clr-text)' }}>Total</span>
-            <span className="text-[18px] font-bold" style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{cartTotal.toFixed(2)}</span>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted block mb-1">
-              Método de Pago
-            </label>
-            <select
-              value={previewPaymentMethod}
-              onChange={(e) => setPreviewPaymentMethod(e.target.value as PaymentMethod)}
-              className="h-9 w-full appearance-none rounded-lg border border-border bg-surface px-3 text-[13px] text-text transition-colors focus:border-border-strong focus:outline-none"
-            >
-              <option value="cash" className="bg-card text-text">Efectivo</option>
-              <option value="card" className="bg-card text-text">Tarjeta</option>
-              <option value="transfer" className="bg-card text-text">Transferencia</option>
-            </select>
-          </div>
-
-          {previewPaymentMethod === 'cash' && (
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted block mb-1">
-                Importe recibido
-              </label>
-              <div className="relative">
-                <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={cashAmount}
-                  onChange={(e) => setCashAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full rounded-lg border border-border bg-surface py-2 pl-8 pr-3 text-[13px] text-text placeholder:text-muted transition-colors focus:border-border-strong focus:outline-none"
-                />
-              </div>
-              {cashAmount && parseFloat(cashAmount) > 0 && (
-                <div
-                  className="flex items-center justify-between mt-2 px-3 py-2 rounded-lg border"
-                  style={{
-                    borderColor: faltante > 0 ? 'var(--clr-danger)' : cambio > 0 ? 'var(--clr-success)' : 'var(--clr-border)',
-                    background: faltante > 0 ? 'var(--clr-danger-dim)' : cambio > 0 ? 'var(--clr-success-dim)' : 'transparent',
-                  }}
-                >
-                  {faltante > 0 ? (
-                    <>
-                      <span className="text-[12px] font-medium" style={{ color: 'var(--clr-danger-text)' }}>Faltante</span>
-                      <span className="text-[15px] font-bold" style={{ color: 'var(--clr-danger-text)' }}>
-                        {config.currency.symbol}{faltante.toFixed(2)}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-[12px] font-medium" style={{ color: 'var(--clr-text)' }}>Vuelto</span>
-                      <span className="text-[15px] font-bold" style={{ color: cambio > 0 ? 'var(--clr-success-text)' : 'var(--clr-text)' }}>
-                        {config.currency.symbol}{cambio.toFixed(2)}
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-6 flex justify-end gap-3">
-          <Button variant="surface" type="button" onClick={() => setCartModalOpen(false)}>Cerrar</Button>
-          <Button type="button" onClick={() => {
-            if (previewPaymentMethod === 'cash') {
-              if (!cashAmount || parseFloat(cashAmount) <= 0) {
-                toast.error('Ingresá el importe recibido en efectivo')
-                return
-              }
-              if (faltante > 0) {
-                toast.error(`Faltan ${config.currency.symbol}${faltante.toFixed(2)} para completar el pago`)
-                return
-              }
+      <CartModal
+        open={cartModalOpen}
+        onClose={() => setCartModalOpen(false)}
+        cart={cart}
+        cartTotal={cartTotal}
+        previewPaymentMethod={previewPaymentMethod}
+        setPreviewPaymentMethod={setPreviewPaymentMethod}
+        cashAmount={cashAmount}
+        setCashAmount={setCashAmount}
+        cambio={cambio}
+        faltante={faltante}
+        updateCartQty={updateCartQty}
+        removeFromCart={removeFromCart}
+        onPreview={() => {
+          if (previewPaymentMethod === 'cash') {
+            if (!cashAmount || parseFloat(cashAmount) <= 0) {
+              toast.error('Ingresá el importe recibido en efectivo')
+              return
             }
-            setCartModalOpen(false); setPreviewOpen(true)
-          }} disabled={cart.length === 0}>
-            Previsualizar ({config.currency.symbol}{cartTotal.toFixed(2)})
-          </Button>
-        </div>
-      </Modal>
+            if (faltante > 0) {
+              toast.error(`Faltan ${config.currency.symbol}${faltante.toFixed(2)} para completar el pago`)
+              return
+            }
+          }
+          setCartModalOpen(false); setPreviewOpen(true)
+        }}
+      />
 
-      {/* ── Modal Preview ── */}
-      <Modal open={previewOpen} onClose={() => setPreviewOpen(false)} title="Previsualizar Venta" size="lg">
-        <div className="space-y-5">
-          <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: 'var(--clr-border)' }}>
-            <MarelyLogo width={180} />
-            <div className="text-right">
-              <p className="text-[12px]" style={{ color: 'var(--clr-muted)' }}>Comprobante de venta</p>
-              <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{new Date().toLocaleDateString('es-ES', { dateStyle: 'long' })}</p>
-            </div>
-          </div>
-
-          <table className="w-full text-[12px]">
-            <thead>
-              <tr className="border-b text-left" style={{ borderColor: 'var(--clr-border)' }}>
-                <th className="pb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Producto</th>
-                <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Cant.</th>
-                <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>P. Unit.</th>
-                <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Subtotal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cart.map((item) => (
-                <tr key={item.productId} className="border-b" style={{ borderColor: 'var(--clr-border-subtle)' }}>
-                  <td className="py-2.5" style={{ color: 'var(--clr-text)' }}>
-                    <p>{item.productName}</p>
-                    {item.productDescription && <p className="text-[10px] text-muted mt-0.5 leading-snug">{item.productDescription}</p>}
-                  </td>
-                  <td className="py-2.5 text-right" style={{ color: 'var(--clr-muted-light)' }}>{item.quantity}</td>
-                  <td className="py-2.5 text-right" style={{ color: 'var(--clr-muted-light)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)}</td>
-                  <td className="py-2.5 text-right font-semibold" style={{ color: 'var(--clr-text)' }}>{config.currency.symbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="flex flex-col items-end gap-1 border-t pt-3" style={{ borderColor: 'var(--clr-border)' }}>
-            <div className="flex w-56 items-center justify-between text-[15px] font-bold">
-              <span style={{ color: 'var(--clr-text)' }}>Total</span>
-              <span style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{cartTotal.toFixed(2)}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between rounded-xl border px-4 py-2.5 text-[12px]" style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-surface)' }}>
-            <span style={{ color: 'var(--clr-muted)' }}>Método de pago</span>
-            <PaymentTag method={previewPaymentMethod} />
-          </div>
-        </div>
-
-        <div className="mt-6 flex justify-end gap-3">
-          <Button variant="gold-outline" onClick={() => setPreviewOpen(false)}>Volver</Button>
-          <Button variant="gold" onClick={handleConfirmSale} disabled={confirming}>
-            {confirming ? 'Procesando...' : 'Confirmar y emitir comprobante'}
-          </Button>
-        </div>
-      </Modal>
-
-      {/* ── Modal Comprobante ── */}
-      <Modal open={receiptOpen} onClose={() => setReceiptOpen(false)} title="Comprobante emitido" size="md">
-        {lastSale && (
-          <div className="space-y-5">
-            <div className="flex flex-col items-center gap-3 border-b pb-4" style={{ borderColor: 'var(--clr-border)' }}>
-              <div
-                className="flex h-12 w-12 items-center justify-center rounded-full"
-                style={{ background: 'var(--clr-success-dim)' }}
-              >
-                <FileText size={22} style={{ color: 'var(--clr-success-text)' }} />
-              </div>
-              <div className="text-center">
-                <h3 className="text-[15px] font-bold" style={{ fontFamily: '"Playfair Display", serif', color: 'var(--clr-text)' }}>{config.storeName}</h3>
-                <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>Comprobante #{lastSale.id.slice(-8).toUpperCase()}</p>
-                <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{new Date(lastSale.createdAt).toLocaleDateString('es-ES', { dateStyle: 'long' })}</p>
-              </div>
-            </div>
-
-            <table className="w-full text-[12px]">
-              <thead>
-                <tr className="border-b text-left" style={{ borderColor: 'var(--clr-border)' }}>
-                  <th className="pb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Producto</th>
-                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Cant.</th>
-                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>P. Unit.</th>
-                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lastSale.items.map((item) => (
-                  <tr key={item.productId} className="border-b" style={{ borderColor: 'var(--clr-border-subtle)' }}>
-                    <td className="py-2.5" style={{ color: 'var(--clr-text)' }}>
-                      <p>{item.productName}</p>
-                      {item.productDescription && <p className="text-[10px] text-muted mt-0.5 leading-snug">{item.productDescription}</p>}
-                    </td>
-                    <td className="py-2.5 text-right" style={{ color: 'var(--clr-muted-light)' }}>{item.quantity}</td>
-                    <td className="py-2.5 text-right" style={{ color: 'var(--clr-muted-light)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)}</td>
-                    <td className="py-2.5 text-right font-semibold" style={{ color: 'var(--clr-text)' }}>{config.currency.symbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="flex flex-col items-end gap-1 border-t pt-3" style={{ borderColor: 'var(--clr-border)' }}>
-              <div className="flex w-56 items-center justify-between text-[15px] font-bold">
-                <span style={{ color: 'var(--clr-text)' }}>Total</span>
-                <span style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{lastSale.total.toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border px-4 py-2.5 text-[12px]" style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-surface)' }}>
-              <span style={{ color: 'var(--clr-muted)' }}>Método de pago</span>
-              <PaymentTag method={lastSale.paymentMethod} />
-            </div>
-          </div>
-        )}
-        <div className="mt-6 flex justify-end">
-          <Button variant="gold-outline" onClick={() => setReceiptOpen(false)}>Cerrar</Button>
-        </div>
-      </Modal>
-
-      {/* ── Modal Detalle de Venta ── */}
-      <Modal open={detailModalOpen} onClose={() => { setDetailModalOpen(false); setDetailSale(null) }} title="Detalle de Venta" size="lg">
-        {detailSale && (
-          <div className="space-y-5">
-            <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: 'var(--clr-border)' }}>
-              <div className="flex items-center gap-3">
-                <MarelyLogo iconOnly width={36} />
-                <div>
-                  <h3 className="text-[15px] font-bold" style={{ fontFamily: '"Playfair Display", serif', color: 'var(--clr-text)' }}>{config.storeName}</h3>
-                  <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>Comprobante de Venta</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>#{detailSale.id.slice(-8).toUpperCase()}</p>
-                <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>
-                  {new Date(detailSale.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-            </div>
-
-            <table className="w-full text-[12px]">
-              <thead>
-                <tr className="border-b text-left" style={{ borderColor: 'var(--clr-border)' }}>
-                  <th className="pb-2 pr-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}></th>
-                  <th className="pb-2 pr-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Producto</th>
-                  <th className="pb-2 pr-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Precio</th>
-                  <th className="pb-2 pr-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Cant.</th>
-                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detailSale.items.map((item) => {
-                  const product = getProductById(item.productId)
-                  const img = product?.images?.[0]
-                  return (
-                    <tr key={item.productId} className="border-b" style={{ borderColor: 'var(--clr-border-subtle)' }}>
-                      <td className="py-2 pr-2">
-                        <div className="h-10 w-10 overflow-hidden rounded-lg border" style={{ borderColor: 'var(--clr-border)' }}>
-                          {img ? (
-                            <Img src={img} alt="" className="h-full w-full object-cover" skeleton="rounded-lg" />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center" style={{ background: 'var(--clr-surface)' }}>
-                              <Package size={14} style={{ color: 'var(--clr-muted)' }} />
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-2 pr-2" style={{ color: 'var(--clr-text)' }}>
-                        <p className="font-medium">{item.productName}</p>
-                        {product?.description && <p className="text-[10px] text-muted mt-0.5 leading-snug">{product.description}</p>}
-                        {product?.barcode && <code className="text-[10px]" style={{ color: 'var(--clr-muted)' }}>{product.barcode}</code>}
-                      </td>
-                      <td className="py-2 pr-2 text-right" style={{ color: 'var(--clr-muted-light)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)}</td>
-                      <td className="py-2 pr-2 text-right" style={{ color: 'var(--clr-muted-light)' }}>{item.quantity}</td>
-                      <td className="py-2 text-right font-semibold" style={{ color: 'var(--clr-text)' }}>{config.currency.symbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-
-            <div className="flex flex-col items-end gap-1 border-t pt-3" style={{ borderColor: 'var(--clr-border)' }}>
-              <div className="flex w-56 items-center justify-between text-[15px] font-bold">
-                <span style={{ color: 'var(--clr-text)' }}>Total</span>
-                <span style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{detailSale.total.toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border px-4 py-2.5 text-[12px]" style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-surface)' }}>
-              <div className="flex items-center gap-4">
-                <div>
-                  <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Método de pago</span>
-                  <div className="mt-1"><PaymentTag method={detailSale.paymentMethod} /></div>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Estado</span>
-                  <div className="mt-1"><StatusBadge status={detailSale.status} /></div>
-                </div>
-              </div>
-              {detailSale.userId && (
-                <div className="text-right">
-                  <span className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--clr-muted)' }}>Vendedor</span>
-                  <p className="mt-0.5 text-[12px] font-medium" style={{ color: 'var(--clr-text)' }}>{sellerName || 'Cargando...'}</p>
-                </div>
-              )}
-            </div>
-
-            <p className="text-[10px] text-center" style={{ color: 'var(--clr-muted)' }}>
-              {detailSale.items.length} producto{detailSale.items.length !== 1 ? 's' : ''} en esta venta
-            </p>
-          </div>
-        )}
-        <div className="mt-6 flex justify-end gap-2">
-          <Button variant="surface" onClick={() => { setDetailModalOpen(false); setDetailSale(null) }}>Cerrar</Button>
-          <Button variant="gold-outline" size="sm" onClick={exportToCSV}>ExportarCSV</Button>
-          <Button variant="gold" size="sm" onClick={exportToPDF}>Exportar PDF</Button>
-        </div>
-      </Modal>
-
-      {/* ── Modal Anular ── */}
-      <Modal open={voidConfirmOpen} onClose={() => { setVoidConfirmOpen(false); setSaleToVoid(null) }} title="Anular venta" size="sm">
-        {saleToVoid && (
-          <div className="space-y-4">
-            <div
-              className="flex items-start gap-3 rounded-xl border p-3"
-              style={{ borderColor: 'var(--clr-danger)', background: 'var(--clr-danger-dim)' }}
-            >
-              <AlertCircle size={17} className="mt-0.5 shrink-0" style={{ color: 'var(--clr-danger-text)' }} />
-              <div className="text-[12px]" style={{ color: 'var(--clr-muted)' }}>
-                <p className="font-semibold" style={{ color: 'var(--clr-danger-text)' }}>¿Anular esta venta?</p>
-                <p className="mt-1">Se restaurará el stock de todos los productos de la venta #{saleToVoid.id.slice(-6).toUpperCase()}.</p>
-                <p className="mt-1">Esta acción no se puede deshacer.</p>
-              </div>
-            </div>
-
-            <div className="rounded-xl border p-3 space-y-1.5" style={{ borderColor: 'var(--clr-border)', background: 'var(--clr-surface)' }}>
-              {saleToVoid.items.map((item) => (
-                <div key={item.productId} className="flex items-center justify-between text-[12px]">
-                  <span style={{ color: 'var(--clr-text)' }}>{item.productName}</span>
-                  <span style={{ color: 'var(--clr-muted-light)' }}>x{item.quantity} → stock restaurado</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end gap-3 border-t pt-4" style={{ borderColor: 'var(--clr-border)' }}>
-              <Button variant="gold-outline" onClick={() => { setVoidConfirmOpen(false); setSaleToVoid(null) }}>
-                Cancelar
-              </Button>
-              <Button variant="surface" onClick={handleVoidSale} disabled={voiding}>
-                <AlertCircle size={14} /> {voiding ? 'Anulando...' : 'Confirmar anulación'}
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <PreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        cart={cart}
+        cartTotal={cartTotal}
+        previewPaymentMethod={previewPaymentMethod}
+        confirming={confirming}
+        handleConfirmSale={handleConfirmSale}
+      />
+      <ReceiptModal
+        open={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+        lastSale={lastSale}
+      />
+      <DetailModal
+        open={detailModalOpen}
+        onClose={() => { setDetailModalOpen(false); setDetailSale(null) }}
+        detailSale={detailSale}
+        sellerName={sellerName}
+        getProductById={getProductById}
+        exportToCSV={exportToCSV}
+        exportToPDF={exportToPDF}
+      />
+      <VoidConfirmModal
+        open={voidConfirmOpen}
+        onClose={() => { setVoidConfirmOpen(false); setSaleToVoid(null) }}
+        saleToVoid={saleToVoid}
+        voiding={voiding}
+        handleVoidSale={handleVoidSale}
+      />
 
       <BarcodeScanner
         open={scannerOpen}
