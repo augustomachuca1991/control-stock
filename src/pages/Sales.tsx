@@ -73,6 +73,7 @@ export function Sales() {
   const addToCartStore = useSaleStore((s) => s.addToCart)
   const updateCartItem = useSaleStore((s) => s.updateCartItem)
   const removeFromCart = useSaleStore((s) => s.removeFromCart)
+  const setCartItemQuantity = useSaleStore((s) => s.setCartItemQuantity)
   const clearCart = useSaleStore((s) => s.clearCart)
   const getProductById = useProductStore((s) => s.getProductById)
   const { create: createSale, voidSale, loading: salesLoading } = useSales()
@@ -862,6 +863,7 @@ export function Sales() {
         faltante={faltante}
         updateCartQty={updateCartQty}
         removeFromCart={removeFromCart}
+        setCartItemQuantity={setCartItemQuantity}
         onPreview={() => {
           if (previewPaymentMethod === 'cash') {
             if (!cashAmount || parseFloat(cashAmount) <= 0) {

@@ -21,6 +21,7 @@ interface SaleState {
   cart: CartItem[]
   addToCart: (item: CartItem) => void
   updateCartItem: (productId: string, delta: number) => void
+  setCartItemQuantity: (productId: string, quantity: number) => void
   removeFromCart: (productId: string) => void
   clearCart: () => void
   createSale: (payload: CreateSalePayload) => Sale | null
@@ -56,6 +57,12 @@ export const useSaleStore = create<SaleState>((set, get) => ({
           return { ...c, quantity: Math.min(next, c.maxStock) }
         })
         .filter(Boolean) as CartItem[],
+    })),
+  setCartItemQuantity: (productId, quantity) =>
+    set((state) => ({
+      cart: state.cart.map((c) =>
+        c.productId === productId ? { ...c, quantity: Math.min(quantity, c.maxStock) } : c
+      ),
     })),
   removeFromCart: (productId) =>
     set((state) => ({

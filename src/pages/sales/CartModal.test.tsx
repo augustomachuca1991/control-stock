@@ -37,6 +37,7 @@ function renderCart(props: Partial<Parameters<typeof CartModal>[0]> = {}) {
   const setDiscountPercent = vi.fn()
   const updateCartQty = vi.fn()
   const removeFromCart = vi.fn()
+  const setCartItemQuantity = vi.fn()
   const onPreview = vi.fn()
 
   return {
@@ -46,6 +47,7 @@ function renderCart(props: Partial<Parameters<typeof CartModal>[0]> = {}) {
     setDiscountPercent,
     updateCartQty,
     removeFromCart,
+    setCartItemQuantity,
     onPreview,
     ...render(
       <CartModal
@@ -64,6 +66,7 @@ function renderCart(props: Partial<Parameters<typeof CartModal>[0]> = {}) {
         faltante={0}
         updateCartQty={updateCartQty}
         removeFromCart={removeFromCart}
+        setCartItemQuantity={setCartItemQuantity}
         onPreview={onPreview}
         {...props}
       />

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Minus, Plus, Trash2, DollarSign, Percent } from 'lucide-react'
 import type { PaymentMethod } from '../../types'
 import type { CartItem } from '../../stores/useSaleStore'
@@ -21,6 +22,7 @@ interface CartModalProps {
   faltante: number
   updateCartQty: (productId: string, delta: number) => void
   removeFromCart: (productId: string) => void
+  setCartItemQuantity: (productId: string, quantity: number) => void
   onPreview: () => void
 }
 
@@ -30,32 +32,69 @@ export function CartModal({
   previewPaymentMethod, setPreviewPaymentMethod,
   cashAmount, setCashAmount,
   cambio, faltante,
-  updateCartQty, removeFromCart, onPreview,
+  updateCartQty, removeFromCart, setCartItemQuantity, onPreview,
 }: CartModalProps) {
+  const [editingQty, setEditingQty] = useState<{ id: string; val: string } | null>(null)
+  const [discountText, setDiscountText] = useState(String(discountPercent || ''))
+  useEffect(() => { setDiscountText(String(discountPercent || '')) }, [open])
   const discountAmount = cartSubtotal * discountPercent / 100
 
   return (
     <Modal open={open} onClose={onClose} title="Carrito" size="lg">
       <div className="space-y-4">
-        {cart.map((item) => (
-          <div
-            key={item.productId}
-            className="flex items-center justify-between border-b pb-2.5 last:border-0"
-            style={{ borderColor: 'var(--clr-border-subtle)' }}
-          >
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium" style={{ color: 'var(--clr-text)' }}>{item.productName}</p>
-              {item.productDescription && <p className="text-[11px] text-muted mt-0.5 leading-snug">{item.productDescription}</p>}
-              <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)} c/u</p>
+        {cart.map((item) => {
+          const isEditing = editingQty?.id === item.productId
+          return (
+            <div
+              key={item.productId}
+              className="flex items-center justify-between border-b pb-2.5 last:border-0"
+              style={{ borderColor: 'var(--clr-border-subtle)' }}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium" style={{ color: 'var(--clr-text)' }}>{item.productName}</p>
+                {item.productDescription && <p className="text-[11px] text-muted mt-0.5 leading-snug">{item.productDescription}</p>}
+                <p className="text-[11px]" style={{ color: 'var(--clr-muted)' }}>{config.currency.symbol}{item.unitPrice.toFixed(2)} c/u</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button variant="gold-outline" size="sm" type="button" onClick={() => updateCartQty(item.productId, -1)}><Minus size={14} /></Button>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={editingQty.val}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (/^\d*$/.test(v)) setEditingQty({ id: item.productId, val: v })
+                    }}
+                    onBlur={() => {
+                      const qty = parseInt(editingQty!.val, 10)
+                      if (qty > 0) setCartItemQuantity(item.productId, Math.min(qty, item.maxStock))
+                      else removeFromCart(item.productId)
+                      setEditingQty(null)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                      if (e.key === 'Escape') setEditingQty(null)
+                    }}
+                    className="w-12 rounded border border-border bg-surface px-1 py-0.5 text-center text-[13px] font-medium outline-none transition-colors focus:border-border-strong"
+                    autoFocus
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditingQty({ id: item.productId, val: String(item.quantity) })}
+                    className="w-8 text-center text-[13px] font-medium hover:bg-primary-dim rounded transition-colors"
+                    style={{ color: 'var(--clr-text)' }}
+                  >
+                    {item.quantity}
+                  </button>
+                )}
+                <Button variant="gold" size="sm" type="button" onClick={() => updateCartQty(item.productId, 1)}><Plus size={14} /></Button>
+                <Button variant="surface" size="sm" type="button" onClick={() => removeFromCart(item.productId)}><Trash2 size={14} style={{ color: 'var(--clr-danger-text)' }} /></Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button variant="gold-outline" size="sm" type="button" onClick={() => updateCartQty(item.productId, -1)}><Minus size={14} /></Button>
-              <span className="w-8 text-center text-[13px] font-medium" style={{ color: 'var(--clr-text)' }}>{item.quantity}</span>
-              <Button variant="gold" size="sm" type="button" onClick={() => updateCartQty(item.productId, 1)}><Plus size={14} /></Button>
-              <Button variant="surface" size="sm" type="button" onClick={() => removeFromCart(item.productId)}><Trash2 size={14} style={{ color: 'var(--clr-danger-text)' }} /></Button>
-            </div>
-          </div>
-        ))}
+          )
+        })}
 
         {cart.length === 0 && (
           <p className="text-center text-[13px] text-muted py-4">El carrito está vacío</p>
@@ -71,27 +110,27 @@ export function CartModal({
               <label className="text-[13px] font-semibold flex items-center gap-1.5" style={{ color: 'var(--clr-text)' }}>
                 <Percent size={14} /> Descuento
               </label>
-              <span className="text-[13px] font-bold" style={{ color: discountPercent > 0 ? 'var(--clr-accent)' : 'var(--clr-text)' }}>
-                {discountPercent}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={discountPercent}
-              onChange={(e) => setDiscountPercent(Number(e.target.value))}
-              className="w-full h-2 rounded-full appearance-none cursor-pointer"
-              style={{
-                background: `linear-gradient(to right, var(--clr-accent) ${discountPercent}%, var(--clr-border) ${discountPercent}%)`,
-                accentColor: 'var(--clr-accent)',
-              }}
-            />
-            <div className="flex items-center justify-between text-[11px] text-muted">
-              <span>0%</span>
-              <span>50%</span>
-              <span>100%</span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={discountText}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (/^\d*\.?\d*$/.test(v)) {
+                      setDiscountText(v)
+                      setDiscountPercent(v === '' ? 0 : parseFloat(v))
+                    }
+                  }}
+                  onBlur={() => {
+                    const clamped = Math.min(100, Math.max(0, discountPercent))
+                    setDiscountPercent(clamped)
+                    setDiscountText(clamped ? String(clamped) : '')
+                  }}
+                  className="w-16 rounded-lg border border-border bg-surface px-2 py-1 text-[13px] text-text text-right font-bold outline-none transition-colors focus:border-border-strong"
+                />
+                <span className="text-[13px] font-bold" style={{ color: discountPercent > 0 ? 'var(--clr-accent)' : 'var(--clr-text)' }}>%</span>
+              </div>
             </div>
           </div>
         )}
