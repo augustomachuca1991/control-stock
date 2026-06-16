@@ -1,4 +1,4 @@
-import { FileText } from 'lucide-react'
+import { FileText, Printer } from 'lucide-react'
 import type { Sale } from '../../types'
 import { Modal } from '../../components/ui/Modal'
 import { Button } from '../../components/ui/Button'
@@ -9,9 +9,10 @@ interface ReceiptModalProps {
   open: boolean
   onClose: () => void
   lastSale: Sale | null
+  onPrint?: () => void
 }
 
-export function ReceiptModal({ open, onClose, lastSale }: ReceiptModalProps) {
+export function ReceiptModal({ open, onClose, lastSale, onPrint }: ReceiptModalProps) {
   return (
     <Modal open={open} onClose={onClose} title="Comprobante emitido" size="md">
       {lastSale && (
@@ -55,6 +56,12 @@ export function ReceiptModal({ open, onClose, lastSale }: ReceiptModalProps) {
           </table>
 
           <div className="flex flex-col items-end gap-1 border-t pt-3" style={{ borderColor: 'var(--clr-border)' }}>
+            {lastSale.discountPercent && lastSale.discountPercent > 0 && (
+              <div className="flex w-56 items-center justify-between text-[12px]">
+                <span style={{ color: 'var(--clr-danger-text)' }}>Descuento ({lastSale.discountPercent}%)</span>
+                <span style={{ color: 'var(--clr-danger-text)' }}>-{config.currency.symbol}{(lastSale.total * lastSale.discountPercent / (100 - lastSale.discountPercent)).toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex w-56 items-center justify-between text-[15px] font-bold">
               <span style={{ color: 'var(--clr-text)' }}>Total</span>
               <span style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{lastSale.total.toFixed(2)}</span>
@@ -67,8 +74,13 @@ export function ReceiptModal({ open, onClose, lastSale }: ReceiptModalProps) {
           </div>
         </div>
       )}
-      <div className="mt-6 flex justify-end">
-        <Button variant="gold-outline" onClick={onClose}>Cerrar</Button>
+      <div className="mt-6 flex justify-end gap-3">
+        <Button variant="surface" onClick={onClose}>Cerrar</Button>
+        {lastSale && onPrint && (
+          <Button variant="gold" onClick={onPrint}>
+            <Printer size={15} /> Imprimir comprobante
+          </Button>
+        )}
       </div>
     </Modal>
   )

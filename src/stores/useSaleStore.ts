@@ -13,6 +13,7 @@ export interface CartItem {
 interface CreateSalePayload {
   items: SaleItem[]
   paymentMethod: PaymentMethod
+  discountPercent?: number
 }
 
 interface SaleState {
@@ -63,14 +64,17 @@ export const useSaleStore = create<SaleState>((set, get) => ({
   clearCart: () => set({ cart: [] }),
   createSale: (payload) => {
     if (payload.items.length === 0) return null
-    const total = payload.items.reduce(
+    const subtotal = payload.items.reduce(
       (sum, item) => sum + item.quantity * item.unitPrice,
       0
     )
+    const discountPct = payload.discountPercent ?? 0
+    const total = subtotal - subtotal * discountPct / 100
     const sale: Sale = {
       id: `sale-${Date.now()}`,
       items: payload.items,
       total,
+      discountPercent: discountPct || undefined,
       paymentMethod: payload.paymentMethod,
       status: 'active',
       createdAt: Date.now(),

@@ -34,6 +34,7 @@ export interface Sale {
   id: string
   items: SaleItem[]
   total: number
+  discountPercent?: number
   paymentMethod: PaymentMethod
   status: SaleStatus
   userId?: string

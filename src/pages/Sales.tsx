@@ -64,6 +64,7 @@ export function Sales() {
 
   const [cartModalOpen, setCartModalOpen] = useState(false)
   const [cashAmount, setCashAmount] = useState('')
+  const [discountPercent, setDiscountPercent] = useState(0)
   const quantityRef = useRef<HTMLInputElement>(null)
 
   const products = useProductStore((s) => s.products)
@@ -90,6 +91,9 @@ export function Sales() {
           <td class="r">${config.currency.symbol}${(i.quantity * i.unitPrice).toFixed(2)}</td>
         </tr>`
     }).join('')
+    const discountRow = sale.discountPercent && sale.discountPercent > 0
+      ? `<tr><td colspan="4" class="r" style="font-size:11px;color:#e53935;padding-top:6px">Descuento (${sale.discountPercent}%)</td><td class="r" style="font-size:11px;color:#e53935;padding-top:6px">-${config.currency.symbol}${(sale.total * sale.discountPercent / (100 - sale.discountPercent)).toFixed(2)}</td></tr>`
+      : ''
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
       @page{margin:0}
       *{margin:0;padding:0;box-sizing:border-box}
@@ -123,6 +127,7 @@ export function Sales() {
         <thead><tr><th>Producto</th><th>Descripción</th><th class="r">Cant.</th><th class="r">P.Unit.</th><th class="r">Subtotal</th></tr></thead>
         <tbody>
           ${itemsRows}
+          ${discountRow}
           <tr class="ttl"><td colspan="4" class="r">Total</td><td class="r">${config.currency.symbol}${sale.total.toFixed(2)}</td></tr>
         </tbody>
       </table>
@@ -256,9 +261,17 @@ export function Sales() {
     updateCartItem(productId, delta)
   }, [updateCartItem])
 
-  const cartTotal = useMemo(
+  const cartSubtotal = useMemo(
     () => cart.reduce((sum, c) => sum + c.quantity * c.unitPrice, 0),
     [cart]
+  )
+  const discountAmount = useMemo(
+    () => cartSubtotal * discountPercent / 100,
+    [cartSubtotal, discountPercent]
+  )
+  const finalTotal = useMemo(
+    () => cartSubtotal - discountAmount,
+    [cartSubtotal, discountAmount]
   )
 
   const handleConfirmSale = useCallback(async () => {
@@ -269,8 +282,8 @@ export function Sales() {
         setConfirming(false)
         return
       }
-      if (parseFloat(cashAmount) < cartTotal) {
-        toast.error(`Faltan ${config.currency.symbol}${(cartTotal - parseFloat(cashAmount)).toFixed(2)} para completar el pago`)
+      if (parseFloat(cashAmount) < finalTotal) {
+        toast.error(`Faltan ${config.currency.symbol}${(finalTotal - parseFloat(cashAmount)).toFixed(2)} para completar el pago`)
         setConfirming(false)
         return
       }
@@ -298,6 +311,7 @@ export function Sales() {
         unitPrice: c.unitPrice,
       })),
       paymentMethod,
+      discountPercent,
     })
     if (sale) {
       const results = await Promise.allSettled(cart.map((c) => reduceStock(c.productId, c.quantity)))
@@ -308,8 +322,9 @@ export function Sales() {
     setConfirming(false)
     setPreviewOpen(false)
     clearCart()
+    setDiscountPercent(0)
     if (sale) setReceiptOpen(true)
-  }, [cart, createSale, reduceStock, getProductById, clearCart, previewPaymentMethod, cashAmount, cartTotal])
+  }, [cart, createSale, reduceStock, getProductById, clearCart, previewPaymentMethod, cashAmount, finalTotal, discountPercent])
 
   const handleVoidSale = useCallback(async () => {
     if (!saleToVoid) return
@@ -371,8 +386,8 @@ export function Sales() {
 
   const cashDiff = useMemo(() => {
     if (previewPaymentMethod !== 'cash' || !cashAmount) return 0
-    return parseFloat(cashAmount) - cartTotal
-  }, [previewPaymentMethod, cashAmount, cartTotal])
+    return parseFloat(cashAmount) - finalTotal
+  }, [previewPaymentMethod, cashAmount, finalTotal])
 
   const cambio = useMemo(() => Math.max(0, cashDiff), [cashDiff])
   const faltante = useMemo(() => Math.abs(Math.min(0, cashDiff)), [cashDiff])
@@ -767,6 +782,17 @@ export function Sales() {
                               {cartQty}
                             </span>
                           )}
+                          {inCart && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); removeFromCart(p.id) }}
+                              className="absolute -left-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full shadow-sm transition-opacity hover:opacity-80"
+                              style={{ background: 'var(--clr-danger-text)' }}
+                              title="Quitar del carrito"
+                            >
+                              <X size={10} className="text-white" />
+                            </button>
+                          )}
                           <p className="text-[13px] font-medium text-text truncate">{p.name}</p>
                           <p className="text-[12px] text-accent font-semibold mt-1">{config.currency.symbol}{p.price.toFixed(2)}</p>
                           <p className="text-[10px] text-muted mt-0.5">{p.stock} uds.</p>
@@ -800,7 +826,7 @@ export function Sales() {
                 }}
               >
                 <span className="text-[12px]" style={{ color: 'var(--clr-text)' }}>
-                  <span className="font-medium">{cart.length} producto{cart.length !== 1 ? 's' : ''}</span> · {config.currency.symbol}{cartTotal.toFixed(2)}
+                  <span className="font-medium">{cart.length} producto{cart.length !== 1 ? 's' : ''}</span> · {config.currency.symbol}{cartSubtotal.toFixed(2)}
                 </span>
                 <div className="flex items-center gap-2">
                   <button
@@ -822,9 +848,12 @@ export function Sales() {
 
       <CartModal
         open={cartModalOpen}
-        onClose={() => setCartModalOpen(false)}
+        onClose={() => { setCartModalOpen(false); setDiscountPercent(0) }}
         cart={cart}
-        cartTotal={cartTotal}
+        cartSubtotal={cartSubtotal}
+        discountPercent={discountPercent}
+        setDiscountPercent={setDiscountPercent}
+        finalTotal={finalTotal}
         previewPaymentMethod={previewPaymentMethod}
         setPreviewPaymentMethod={setPreviewPaymentMethod}
         cashAmount={cashAmount}
@@ -852,7 +881,9 @@ export function Sales() {
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         cart={cart}
-        cartTotal={cartTotal}
+        cartSubtotal={cartSubtotal}
+        discountPercent={discountPercent}
+        finalTotal={finalTotal}
         previewPaymentMethod={previewPaymentMethod}
         confirming={confirming}
         handleConfirmSale={handleConfirmSale}
@@ -861,6 +892,22 @@ export function Sales() {
         open={receiptOpen}
         onClose={() => setReceiptOpen(false)}
         lastSale={lastSale}
+        onPrint={lastSale ? () => {
+          const html = receiptHTML(lastSale, sellerName)
+          const iframe = document.createElement('iframe')
+          iframe.style.position = 'absolute'
+          iframe.style.width = '0'
+          iframe.style.height = '0'
+          iframe.style.border = 'none'
+          document.body.appendChild(iframe)
+          const doc = iframe.contentDocument || iframe.contentWindow?.document
+          if (doc) { doc.open(); doc.write(html); doc.close() }
+          setTimeout(() => {
+            iframe.contentWindow?.focus()
+            iframe.contentWindow?.print()
+            setTimeout(() => document.body.removeChild(iframe), 1000)
+          }, 500)
+        } : undefined}
       />
       <DetailModal
         open={detailModalOpen}

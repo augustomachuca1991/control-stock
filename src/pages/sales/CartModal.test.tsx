@@ -34,6 +34,7 @@ function renderCart(props: Partial<Parameters<typeof CartModal>[0]> = {}) {
   const onClose = vi.fn()
   const setPreviewPaymentMethod = vi.fn()
   const setCashAmount = vi.fn()
+  const setDiscountPercent = vi.fn()
   const updateCartQty = vi.fn()
   const removeFromCart = vi.fn()
   const onPreview = vi.fn()
@@ -42,6 +43,7 @@ function renderCart(props: Partial<Parameters<typeof CartModal>[0]> = {}) {
     onClose,
     setPreviewPaymentMethod,
     setCashAmount,
+    setDiscountPercent,
     updateCartQty,
     removeFromCart,
     onPreview,
@@ -50,7 +52,10 @@ function renderCart(props: Partial<Parameters<typeof CartModal>[0]> = {}) {
         open={true}
         onClose={onClose}
         cart={cartItems}
-        cartTotal={600}
+        cartSubtotal={600}
+        discountPercent={0}
+        setDiscountPercent={setDiscountPercent}
+        finalTotal={600}
         previewPaymentMethod="cash"
         setPreviewPaymentMethod={setPreviewPaymentMethod}
         cashAmount=""
@@ -84,7 +89,7 @@ describe('CartModal', () => {
   })
 
   it('shows empty message when cart is empty', () => {
-    renderCart({ cart: [], cartTotal: 0 })
+    renderCart({ cart: [], cartSubtotal: 0, finalTotal: 0 })
     expect(screen.getByText('El carrito está vacío')).toBeInTheDocument()
   })
 
@@ -142,7 +147,7 @@ describe('CartModal', () => {
   })
 
   it('disables Previsualizar when cart is empty', () => {
-    renderCart({ cart: [], cartTotal: 0 })
+    renderCart({ cart: [], cartSubtotal: 0, finalTotal: 0 })
     expect(screen.getByRole('button', { name: /previsualizar/i })).toBeDisabled()
   })
 

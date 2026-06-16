@@ -121,6 +121,23 @@ describe('createSale', () => {
     expect(typeof sale!.createdAt).toBe('number')
   })
 
+  it('applies discountPercent to total', () => {
+    useSaleStore.getState().addToCart(cartItem())
+    const sale = useSaleStore.getState().createSale({
+      items: useSaleStore.getState().cart.map((c) => ({
+        productId: c.productId,
+        productName: c.productName,
+        quantity: c.quantity,
+        unitPrice: c.unitPrice,
+      })),
+      paymentMethod: 'cash',
+      discountPercent: 15,
+    })
+    expect(sale).not.toBeNull()
+    expect(sale!.total).toBe(170) // 200 - 200*15/100 = 170
+    expect(sale!.discountPercent).toBe(15)
+  })
+
   it('returns null when items array is empty', () => {
     const sale = useSaleStore.getState().createSale({ items: [], paymentMethod: 'cash' })
     expect(sale).toBeNull()

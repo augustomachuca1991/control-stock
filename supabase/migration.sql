@@ -284,3 +284,7 @@ returns void language sql as $$
   delete from bot_sessions
   where created_at < now() - interval '1 hour';
 $$;
+
+-- 12. DESCUENTO EN VENTAS ------------------------------------------
+
+alter table sales add column discount_percent numeric not null default 0;

@@ -83,6 +83,12 @@ export function DetailModal({
           </table>
 
           <div className="flex flex-col items-end gap-1 border-t pt-3" style={{ borderColor: 'var(--clr-border)' }}>
+            {detailSale.discountPercent && detailSale.discountPercent > 0 && (
+              <div className="flex w-56 items-center justify-between text-[12px]">
+                <span style={{ color: 'var(--clr-danger-text)' }}>Descuento ({detailSale.discountPercent}%)</span>
+                <span style={{ color: 'var(--clr-danger-text)' }}>-{config.currency.symbol}{(detailSale.total * detailSale.discountPercent / (100 - detailSale.discountPercent)).toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex w-56 items-center justify-between text-[15px] font-bold">
               <span style={{ color: 'var(--clr-text)' }}>Total</span>
               <span style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{detailSale.total.toFixed(2)}</span>

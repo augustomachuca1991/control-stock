@@ -32,6 +32,7 @@ export function useSales() {
         id: s.id,
         items: s.items as SaleItem[],
         total: Number(s.total),
+        discountPercent: Number(s.discount_percent) || undefined,
         paymentMethod: s.payment_method as PaymentMethod,
         status: s.status as 'active' | 'voided',
         userId: s.user_id ?? undefined,
@@ -48,8 +49,10 @@ export function useSales() {
 
   useEffect(() => { load() }, [load])
 
-  const create = useCallback(async (input: { items: SaleItem[]; paymentMethod: PaymentMethod }) => {
-    const total = input.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)
+  const create = useCallback(async (input: { items: SaleItem[]; paymentMethod: PaymentMethod; discountPercent?: number }) => {
+    const subtotal = input.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)
+    const discountPct = input.discountPercent ?? 0
+    const total = subtotal - subtotal * discountPct / 100
 
     const { data, error: err } = await supabase
       .from('sales')
@@ -58,6 +61,7 @@ export function useSales() {
         total,
         payment_method: input.paymentMethod,
         status: 'active',
+        discount_percent: discountPct,
       })
       .select()
       .single()
@@ -70,6 +74,7 @@ export function useSales() {
         id: data.id,
         items: data.items as unknown as SaleItem[],
         total: Number(data.total),
+        discountPercent: Number(data.discount_percent) || undefined,
         paymentMethod: data.payment_method as PaymentMethod,
         status: 'active',
         createdAt: new Date(data.created_at).getTime(),

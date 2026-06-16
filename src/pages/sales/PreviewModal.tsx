@@ -10,14 +10,17 @@ interface PreviewModalProps {
   open: boolean
   onClose: () => void
   cart: CartItem[]
-  cartTotal: number
+  cartSubtotal: number
+  discountPercent: number
+  finalTotal: number
   previewPaymentMethod: PaymentMethod
   confirming: boolean
   handleConfirmSale: () => void
 }
 
 export function PreviewModal({
-  open, onClose, cart, cartTotal,
+  open, onClose, cart, cartSubtotal,
+  discountPercent, finalTotal,
   previewPaymentMethod, confirming, handleConfirmSale,
 }: PreviewModalProps) {
   return (
@@ -56,9 +59,21 @@ export function PreviewModal({
         </table>
 
         <div className="flex flex-col items-end gap-1 border-t pt-3" style={{ borderColor: 'var(--clr-border)' }}>
+          {discountPercent > 0 && (
+            <>
+              <div className="flex w-56 items-center justify-between text-[12px]">
+                <span style={{ color: 'var(--clr-muted)' }}>Subtotal</span>
+                <span style={{ color: 'var(--clr-text)' }}>{config.currency.symbol}{cartSubtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex w-56 items-center justify-between text-[12px]">
+                <span style={{ color: 'var(--clr-danger-text)' }}>Descuento ({discountPercent}%)</span>
+                <span style={{ color: 'var(--clr-danger-text)' }}>-{config.currency.symbol}{(cartSubtotal * discountPercent / 100).toFixed(2)}</span>
+              </div>
+            </>
+          )}
           <div className="flex w-56 items-center justify-between text-[15px] font-bold">
             <span style={{ color: 'var(--clr-text)' }}>Total</span>
-            <span style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{cartTotal.toFixed(2)}</span>
+            <span style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{finalTotal.toFixed(2)}</span>
           </div>
         </div>
 

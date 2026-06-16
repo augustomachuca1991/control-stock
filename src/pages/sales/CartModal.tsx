@@ -1,4 +1,4 @@
-import { Minus, Plus, Trash2, DollarSign } from 'lucide-react'
+import { Minus, Plus, Trash2, DollarSign, Percent } from 'lucide-react'
 import type { PaymentMethod } from '../../types'
 import type { CartItem } from '../../stores/useSaleStore'
 import { Modal } from '../../components/ui/Modal'
@@ -9,7 +9,10 @@ interface CartModalProps {
   open: boolean
   onClose: () => void
   cart: CartItem[]
-  cartTotal: number
+  cartSubtotal: number
+  discountPercent: number
+  setDiscountPercent: (v: number) => void
+  finalTotal: number
   previewPaymentMethod: PaymentMethod
   setPreviewPaymentMethod: (v: PaymentMethod) => void
   cashAmount: string
@@ -22,12 +25,15 @@ interface CartModalProps {
 }
 
 export function CartModal({
-  open, onClose, cart, cartTotal,
+  open, onClose, cart, cartSubtotal,
+  discountPercent, setDiscountPercent, finalTotal,
   previewPaymentMethod, setPreviewPaymentMethod,
   cashAmount, setCashAmount,
   cambio, faltante,
   updateCartQty, removeFromCart, onPreview,
 }: CartModalProps) {
+  const discountAmount = cartSubtotal * discountPercent / 100
+
   return (
     <Modal open={open} onClose={onClose} title="Carrito" size="lg">
       <div className="space-y-4">
@@ -55,12 +61,60 @@ export function CartModal({
           <p className="text-center text-[13px] text-muted py-4">El carrito está vacío</p>
         )}
 
+        {/* ── Discount slider ── */}
+        {cart.length > 0 && (
+          <div
+            className="border-t pt-3 space-y-2"
+            style={{ borderColor: 'var(--clr-border)' }}
+          >
+            <div className="flex items-center justify-between">
+              <label className="text-[13px] font-semibold flex items-center gap-1.5" style={{ color: 'var(--clr-text)' }}>
+                <Percent size={14} /> Descuento
+              </label>
+              <span className="text-[13px] font-bold" style={{ color: discountPercent > 0 ? 'var(--clr-accent)' : 'var(--clr-text)' }}>
+                {discountPercent}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={discountPercent}
+              onChange={(e) => setDiscountPercent(Number(e.target.value))}
+              className="w-full h-2 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, var(--clr-accent) ${discountPercent}%, var(--clr-border) ${discountPercent}%)`,
+                accentColor: 'var(--clr-accent)',
+              }}
+            />
+            <div className="flex items-center justify-between text-[11px] text-muted">
+              <span>0%</span>
+              <span>50%</span>
+              <span>100%</span>
+            </div>
+          </div>
+        )}
+
+        {/* ── Totals ── */}
         <div
-          className="flex items-center justify-between border-t pt-3"
+          className="border-t pt-3 space-y-1"
           style={{ borderColor: 'var(--clr-border)' }}
         >
-          <span className="text-[13px] font-semibold" style={{ color: 'var(--clr-text)' }}>Total</span>
-          <span className="text-[18px] font-bold" style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{cartTotal.toFixed(2)}</span>
+          <div className="flex items-center justify-between text-[12px]">
+            <span style={{ color: 'var(--clr-muted)' }}>Subtotal</span>
+            <span style={{ color: 'var(--clr-text)' }}>{config.currency.symbol}{cartSubtotal.toFixed(2)}</span>
+          </div>
+          {discountPercent > 0 && (
+            <div className="flex items-center justify-between text-[12px]">
+              <span style={{ color: 'var(--clr-danger-text)' }}>Descuento ({discountPercent}%)</span>
+              <span style={{ color: 'var(--clr-danger-text)' }}>-{config.currency.symbol}{discountAmount.toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between border-t pt-1.5" style={{ borderColor: 'var(--clr-border-subtle)' }}>
+            <span className="text-[13px] font-semibold" style={{ color: 'var(--clr-text)' }}>Total</span>
+            <span className="text-[18px] font-bold" style={{ color: 'var(--clr-accent)' }}>{config.currency.symbol}{finalTotal.toFixed(2)}</span>
+          </div>
         </div>
 
         <div>
@@ -127,7 +181,7 @@ export function CartModal({
       <div className="mt-6 flex justify-end gap-3">
         <Button variant="surface" type="button" onClick={onClose}>Cerrar</Button>
         <Button type="button" onClick={onPreview} disabled={cart.length === 0}>
-          Previsualizar ({config.currency.symbol}{cartTotal.toFixed(2)})
+          Previsualizar ({config.currency.symbol}{finalTotal.toFixed(2)})
         </Button>
       </div>
     </Modal>
