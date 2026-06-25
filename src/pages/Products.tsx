@@ -18,21 +18,10 @@ import { useProducts } from '../hooks/useProducts'
 import { useCategoryStore } from '../stores/useCategoryStore'
 import { useCategories } from '../hooks/useCategories'
 import { productSchema } from '../lib/validation'
+import { useProductFormStore, emptyForm, type ProductFormValues } from '../stores/useProductFormStore'
 import type { Product } from '../types'
 import { config } from '../config'
 import { useAuth } from '../contexts/AuthContext'
-
-interface ProductFormValues {
-  name: string; brand: string; barcode: string; categoryId: string
-  price: string; cost: string; stock: string; minStock: string
-  description: string; images: string[]; enabled: boolean
-}
-
-const emptyForm: ProductFormValues = {
-  name: '', brand: '', barcode: '', categoryId: '',
-  price: '', cost: '', stock: '', minStock: '', description: '', images: [],
-  enabled: true,
-}
 
 function ProductThumb({ src, className }: { src?: string; className?: string }) {
   const [errored, setErrored] = useState(false)
@@ -46,6 +35,26 @@ function ProductThumb({ src, className }: { src?: string; className?: string }) 
   return (
     <Img src={src} alt="" className={`rounded-lg object-cover ${className ?? 'h-10 w-10'}`} skeleton="rounded-lg" onError={() => setErrored(true)} />
   )
+}
+
+function isBarcode(value: string): boolean {
+  const v = value.trim()
+  if (!v) return false
+  if (/^\d{8,14}$/.test(v)) return true
+  if (/^[A-Za-z0-9+\-]{4,30}$/.test(v)) return true
+  return false
+}
+
+function FormDraftSaver({ values, editingId, formModalOpen }: { values: ProductFormValues; editingId: string | null; formModalOpen: boolean }) {
+  const setDraft = useProductFormStore(s => s.setDraft)
+
+  useEffect(() => {
+    if (formModalOpen && !editingId) {
+      setDraft(values)
+    }
+  }, [values, formModalOpen, editingId, setDraft])
+
+  return null
 }
 
 export function Products() {
@@ -62,6 +71,7 @@ export function Products() {
   const [scannerOpen, setScannerOpen] = useState(false)
   const [formScannerOpen, setFormScannerOpen] = useState(false)
   const barcodeRef = useRef<HTMLInputElement>(null)
+  const createInitialValuesRef = useRef<ProductFormValues>({ ...emptyForm })
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -98,9 +108,14 @@ export function Products() {
 
   const openCreate = useCallback(() => {
     setEditingId(null)
+    const draft = useProductFormStore.getState().draft
+    const barcode = isBarcode(search) ? search.trim() : ''
+    createInitialValuesRef.current = draft
+      ? { ...draft, barcode: barcode || draft.barcode }
+      : { ...emptyForm, barcode }
     setFormModalOpen(true)
     setTimeout(() => barcodeRef.current?.focus(), 100)
-  }, [])
+  }, [search])
 
   const openEdit = useCallback((e: React.MouseEvent, id: string) => {
     e.stopPropagation()
@@ -279,7 +294,7 @@ export function Products() {
               minStock: String(p.minStock), description: p.description, images: p.images ?? [],
               enabled: p.enabled ?? true,
             } : emptyForm
-          })() : emptyForm}
+          })() : createInitialValuesRef.current}
           validationSchema={productSchema}
           enableReinitialize
           onSubmit={async (values, { setSubmitting }) => {
@@ -296,10 +311,12 @@ export function Products() {
             else await addProduct(base)
             setSubmitting(false)
             setFormModalOpen(false)
+            useProductFormStore.getState().clearDraft()
           }}
         >
           {({ values, setFieldValue, isSubmitting, resetForm }) => (
             <>
+            <FormDraftSaver values={values} editingId={editingId} formModalOpen={formModalOpen} />
             <Form>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
@@ -393,7 +410,7 @@ export function Products() {
                 </div>
               </div>
               <div className="mt-6 flex justify-end gap-3">
-                <Button variant="gold-outline" onClick={() => { resetForm(); setFormModalOpen(false) }}>Cancelar</Button>
+                <Button variant="gold-outline" onClick={() => { resetForm(); setFormModalOpen(false); useProductFormStore.getState().clearDraft() }}>Cancelar</Button>
                 <Button variant="gold" type="submit" disabled={isSubmitting}>
                   {isSubmitting ? 'Guardando...' : (editingId ? 'Guardar Cambios' : 'Crear Producto')}
                 </Button>
